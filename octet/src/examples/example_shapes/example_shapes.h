@@ -17,6 +17,10 @@ namespace octet {
     ~example_shapes() {
     }
 
+	int initialCount = 25;
+	int counter = 0;
+	
+
     /// this is called once OpenGL is initialized
     void app_init() {
       app_scene =  new visual_scene();
@@ -27,14 +31,17 @@ namespace octet {
       material *green = new material(vec4(0, 1, 0, 1));
       material *blue = new material(vec4(0, 0, 1, 1));
 
+	  // Left ball
       mat4t mat;
-      mat.translate(-3, 6, 0);
+      mat.translate(-3, 15, 0);
       app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 2), red, true);
 
+	  // Cube
       mat.loadIdentity();
       mat.translate(0, 10, 0);
       app_scene->add_shape(mat, new mesh_box(vec3(2, 2, 2)), red, true);
 
+	  // Right ball
       mat.loadIdentity();
       mat.translate( 3, 6, 0);
       app_scene->add_shape(mat, new mesh_cylinder(zcylinder(vec3(0, 0, 0), 2, 4)), blue, true);
@@ -56,6 +63,16 @@ namespace octet {
 
       // draw the scene
       app_scene->render((float)vx / vy);
+
+	  // spawn new sphere when the counter reaches zero.
+	  if (counter-- <= 0) {
+		  counter = initialCount;
+
+		  mat4t mat;
+		  mat.loadIdentity();
+		  mat.translate(0, 20, 0);
+		  app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
+	  }
     }
   };
 }
