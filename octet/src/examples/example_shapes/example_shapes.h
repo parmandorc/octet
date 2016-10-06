@@ -20,6 +20,7 @@ namespace octet {
 	int initialCount = 25;
 	int counter = 0;
 	
+	class random randomizer;
 
     /// this is called once OpenGL is initialized
     void app_init() {
@@ -71,7 +72,8 @@ namespace octet {
 		  mat4t mat;
 		  mat.loadIdentity();
 		  mat.translate(0, 20, 0);
-		  app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
+		  mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
+		  newSphere->get_node()->apply_central_force(vec3(randomizer.get(-250.0f, 250.0f), 0.0f, 0.0f));
 	  }
     }
   };
