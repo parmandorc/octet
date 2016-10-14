@@ -33,18 +33,23 @@ namespace octet {
 
     // true if this sprite is enabled.
     bool enabled;
+
+    // true if this sprite should be tinted red
+    bool isRed;
+
   public:
     sprite() {
       texture = 0;
       enabled = true;
     }
 
-    void init(int _texture, float x, float y, float w, float h) {
+    void init(int _texture, float x, float y, float w, float h, bool _isRed = false) {
       modelToWorld.loadIdentity();
       modelToWorld.translate(x, y, 0);
       halfWidth = w * 0.5f;
       halfHeight = h * 0.5f;
       texture = _texture;
+      isRed = _isRed;
       enabled = true;
     }
 
@@ -59,6 +64,10 @@ namespace octet {
       // set up opengl to draw textured triangles using sampler 0 (GL_TEXTURE0)
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture);
+
+      // Set to red
+      GLint isRedLoc = glGetUniformLocation(shader.get_program(), "isRed");
+      if (isRedLoc != -1) glUniform1i(isRedLoc, isRed);
 
       // use "old skool" rendering
       //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
@@ -436,7 +445,7 @@ namespace octet {
         for (int i = 0; i != num_cols; ++i) {
           assert(first_invaderer_sprite + i + j*num_cols <= last_invaderer_sprite);
           sprites[first_invaderer_sprite + i + j*num_cols].init(
-            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f
+            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f, true
           );
         }
       }
