@@ -155,7 +155,6 @@ namespace octet {
 
       // sprite definitions
       ship_sprite = 0,
-      game_over_sprite,
 
       first_invaderer_sprite,
       last_invaderer_sprite = first_invaderer_sprite + num_invaderers - 1,
@@ -168,6 +167,8 @@ namespace octet {
 
       first_border_sprite,
       last_border_sprite = first_border_sprite + num_borders - 1,
+
+      game_over_sprite,
 
       num_sprites,
 
