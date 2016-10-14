@@ -39,10 +39,17 @@ namespace octet { namespace shaders {
       const char fragment_shader[] = SHADER_STR(
         varying vec2 uv_;
         uniform sampler2D sampler;
+        uniform bool is3D;
         uniform bool isRed;
-        void main() { float distToCenter = max(abs(0.5f - uv_[0]), abs(0.5f - uv_[1])); 
-        gl_FragColor = texture2D(sampler, uv_) - distToCenter * 1.25f * vec4(1.0f, 1.0f, 1.0f, 0.0f);
-        if (isRed)  gl_FragColor -= vec4(0.0f, 1.0f, 1.0f, 0.0f);
+        void main() {  
+          gl_FragColor = texture2D(sampler, uv_);
+          
+          if (is3D) {
+            float distToCenter = max(abs(0.5f - uv_[0]), abs(0.5f - uv_[1]));
+            gl_FragColor -= distToCenter * 1.25f * vec4(1.0f, 1.0f, 1.0f, 0.0f);
+          }
+
+          if (isRed)  gl_FragColor -= vec4(0.0f, 1.0f, 1.0f, 0.0f);
         }
       );
     

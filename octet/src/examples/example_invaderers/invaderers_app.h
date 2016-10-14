@@ -34,6 +34,9 @@ namespace octet {
     // true if this sprite is enabled.
     bool enabled;
 
+    // true if this sprite should be rendered in false 3D
+    bool is3D;
+
     // true if this sprite should be tinted red
     bool isRed;
 
@@ -43,12 +46,13 @@ namespace octet {
       enabled = true;
     }
 
-    void init(int _texture, float x, float y, float w, float h, bool _isRed = false) {
+    void init(int _texture, float x, float y, float w, float h, bool _is3D = false, bool _isRed = false) {
       modelToWorld.loadIdentity();
       modelToWorld.translate(x, y, 0);
       halfWidth = w * 0.5f;
       halfHeight = h * 0.5f;
       texture = _texture;
+      is3D = _is3D;
       isRed = _isRed;
       enabled = true;
     }
@@ -65,8 +69,11 @@ namespace octet {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture);
 
-      // Set to red
-      GLint isRedLoc = glGetUniformLocation(shader.get_program(), "isRed");
+      // Set render uniform parameters
+      GLuint program = shader.get_program();
+      GLint is3DLoc = glGetUniformLocation(program, "is3D");
+      if (is3DLoc != -1) glUniform1i(is3DLoc, is3D);
+      GLint isRedLoc = glGetUniformLocation(program, "isRed");
       if (isRedLoc != -1) glUniform1i(isRedLoc, isRed);
 
       // use "old skool" rendering
@@ -435,7 +442,7 @@ namespace octet {
       font_texture = resource_dict::get_texture_handle(GL_RGBA, "assets/big_0.gif");
 
       GLuint ship = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/ship.gif");
-      sprites[ship_sprite].init(ship, 0, -2.75f, 0.25f, 0.25f);
+      sprites[ship_sprite].init(ship, 0, -2.75f, 0.25f, 0.25f, true);
 
       GLuint GameOver = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/GameOver.gif");
       sprites[game_over_sprite].init(GameOver, 20, 0, 3, 1.5f);
@@ -445,7 +452,7 @@ namespace octet {
         for (int i = 0; i != num_cols; ++i) {
           assert(first_invaderer_sprite + i + j*num_cols <= last_invaderer_sprite);
           sprites[first_invaderer_sprite + i + j*num_cols].init(
-            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f, true
+            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f, true, true
           );
         }
       }
@@ -461,7 +468,7 @@ namespace octet {
       GLuint missile = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/missile.gif");
       for (int i = 0; i != num_missiles; ++i) {
         // create missiles off-screen
-        sprites[first_missile_sprite+i].init(missile, 20, 0, 0.0625f, 0.25f);
+        sprites[first_missile_sprite+i].init(missile, 20, 0, 0.0625f, 0.25f, true);
         sprites[first_missile_sprite+i].is_enabled() = false;
       }
 
@@ -469,7 +476,7 @@ namespace octet {
       GLuint bomb = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/bomb.gif");
       for (int i = 0; i != num_bombs; ++i) {
         // create bombs off-screen
-        sprites[first_bomb_sprite+i].init(bomb, 20, 0, 0.0625f, 0.25f);
+        sprites[first_bomb_sprite+i].init(bomb, 20, 0, 0.0625f, 0.25f, true, true);
         sprites[first_bomb_sprite+i].is_enabled() = false;
       }
 
