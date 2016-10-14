@@ -37,8 +37,11 @@ namespace octet {
     // true if this sprite should be rendered in false 3D
     bool is3D;
 
-    // true if this sprite should be tinted red
-    bool isRed;
+    // true if this sprite should be tinted with specified color
+    bool doApplyTint;
+
+    // the color (without alpha channel) that the sprite should be tinted with
+    vec3 colorTint;
 
   public:
     sprite() {
@@ -46,14 +49,15 @@ namespace octet {
       enabled = true;
     }
 
-    void init(int _texture, float x, float y, float w, float h, bool _is3D = false, bool _isRed = false) {
+    void init(int _texture, float x, float y, float w, float h, bool _is3D = false, bool _doApplyTint = false, vec3 _colorTint = vec3(0.0f, 0.0f, 0.0f)) {
       modelToWorld.loadIdentity();
       modelToWorld.translate(x, y, 0);
       halfWidth = w * 0.5f;
       halfHeight = h * 0.5f;
       texture = _texture;
       is3D = _is3D;
-      isRed = _isRed;
+      doApplyTint = _doApplyTint;
+      colorTint = _colorTint;
       enabled = true;
     }
 
@@ -73,8 +77,10 @@ namespace octet {
       GLuint program = shader.get_program();
       GLint is3DLoc = glGetUniformLocation(program, "is3D");
       if (is3DLoc != -1) glUniform1i(is3DLoc, is3D);
-      GLint isRedLoc = glGetUniformLocation(program, "isRed");
-      if (isRedLoc != -1) glUniform1i(isRedLoc, isRed);
+      GLint doApplyTintLoc = glGetUniformLocation(program, "doApplyTint");
+      if (doApplyTintLoc != -1) glUniform1i(doApplyTintLoc, doApplyTint);
+      GLint colorTintLoc = glGetUniformLocation(program, "colorTint");
+      if (colorTintLoc != -1) glUniform3f(colorTintLoc, colorTint[0], colorTint[1], colorTint[2]);
 
       // use "old skool" rendering
       //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
@@ -452,7 +458,7 @@ namespace octet {
         for (int i = 0; i != num_cols; ++i) {
           assert(first_invaderer_sprite + i + j*num_cols <= last_invaderer_sprite);
           sprites[first_invaderer_sprite + i + j*num_cols].init(
-            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f, true, true
+            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
           );
         }
       }
@@ -476,7 +482,7 @@ namespace octet {
       GLuint bomb = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/bomb.gif");
       for (int i = 0; i != num_bombs; ++i) {
         // create bombs off-screen
-        sprites[first_bomb_sprite+i].init(bomb, 20, 0, 0.0625f, 0.25f, true, true);
+        sprites[first_bomb_sprite+i].init(bomb, 20, 0, 0.0625f, 0.25f, true, true, vec3(1.0f, 0.0f, 0.0f));
         sprites[first_bomb_sprite+i].is_enabled() = false;
       }
 

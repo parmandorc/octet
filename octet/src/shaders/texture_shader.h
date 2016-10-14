@@ -40,7 +40,8 @@ namespace octet { namespace shaders {
         varying vec2 uv_;
         uniform sampler2D sampler;
         uniform bool is3D;
-        uniform bool isRed;
+        uniform bool doApplyTint;
+        uniform vec3 colorTint;
         void main() {  
           gl_FragColor = texture2D(sampler, uv_);
           
@@ -49,7 +50,8 @@ namespace octet { namespace shaders {
             gl_FragColor -= distToCenter * 1.25f * vec4(1.0f, 1.0f, 1.0f, 0.0f);
           }
 
-          if (isRed)  gl_FragColor -= vec4(0.0f, 1.0f, 1.0f, 0.0f);
+          if (doApplyTint)
+            gl_FragColor -= vec4(1.0f - colorTint[0], 1.0f - colorTint[1], 1.0f - colorTint[2], 0.0f);
         }
       );
     
