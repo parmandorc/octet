@@ -125,6 +125,12 @@ namespace octet {
       modelToWorld.translate(x, y, 0);
     }
 
+    //move the object to the specified position
+    void set_position(float x, float y) {
+      modelToWorld.loadIdentity();
+      modelToWorld.translate(x, y, 0);
+    }
+
     // position the object relative to another.
     void set_relative(sprite &rhs, float x, float y) {
       modelToWorld = rhs.modelToWorld;
@@ -219,6 +225,11 @@ namespace octet {
 
     // big array of sprites
     sprite sprites[num_sprites];
+
+    //Information for handling new rows of enemies
+    const unsigned int framesBetweenRows = 75;
+    int timerForNextRow;
+    std::vector<unsigned int> availableInvaderers;
 
     // random number generator
     class random randomizer;
@@ -375,6 +386,19 @@ namespace octet {
       }
     }
 
+    //Spawn a new row of enemies
+    void spawn_invaders() {
+      for (int i = 0; i != num_cols && !availableInvaderers.empty(); ++i) {
+        //Pop the index for the first available invaderer
+        unsigned int sprite_index = availableInvaderers[0];
+        availableInvaderers.erase(availableInvaderers.begin());
+
+        sprite &invaderer = sprites[sprite_index];
+        invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+        invaderer.is_enabled() = true;
+      }
+    }
+
     // move the array of enemies
     void move_invaders(float dx, float dy) {
       for (int j = 0; j != num_invaderers; ++j) {
@@ -458,8 +482,10 @@ namespace octet {
         for (int i = 0; i != num_cols; ++i) {
           assert(first_invaderer_sprite + i + j*num_cols <= last_invaderer_sprite);
           sprites[first_invaderer_sprite + i + j*num_cols].init(
-            invaderer, ((float)i - num_cols * 0.5f) * 0.5f, 2.50f - ((float)j * 0.5f), 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
+            invaderer, 20, 0, 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
           );
+          sprites[first_invaderer_sprite + i + j*num_cols].is_enabled() = false;
+          availableInvaderers.push_back(first_invaderer_sprite + i + j*num_cols);
         }
       }
 
@@ -495,7 +521,7 @@ namespace octet {
       // sundry counters and game state.
       missiles_disabled = 0;
       bombs_disabled = 50;
-      invader_velocity = 0.01f;
+      invader_velocity = -0.005f;
       live_invaderers = num_invaderers;
       num_lives = 3;
       game_over = false;
@@ -518,13 +544,22 @@ namespace octet {
 
       move_bombs();
 
-      move_invaders(invader_velocity, 0);
+      //Process timer for spawning a new row
+      if (--timerForNextRow <= 0) {
+        timerForNextRow = framesBetweenRows;
 
+        spawn_invaders();
+      }
+
+      move_invaders(0, invader_velocity);
+
+      /*
       sprite &border = sprites[first_border_sprite+(invader_velocity < 0 ? 2 : 3)];
       if (invaders_collide(border)) {
         invader_velocity = -invader_velocity;
         move_invaders(invader_velocity, -0.1f);
       }
+      */
     }
 
     // this is called to draw the world
