@@ -174,12 +174,11 @@ namespace octet {
 
     enum {
       num_sound_sources = 8,
-      num_rows = 5,
       num_cols = 10,
       num_missiles = 2,
       num_bombs = 2,
       num_borders = 4,
-      num_invaderers = num_rows * num_cols,
+      num_invaderers = 100,
 
       // sprite definitions
       ship_sprite = 0,
@@ -207,12 +206,11 @@ namespace octet {
     int bombs_disabled;
 
     // accounting for bad guys
-    int live_invaderers;
     int num_lives;
 
     // game state
     bool game_over;
-    int score;
+    unsigned int score;
 
     // speed of enemy
     float invader_velocity;
@@ -227,7 +225,7 @@ namespace octet {
     sprite sprites[num_sprites];
 
     //Information for handling new rows of enemies
-    const unsigned int framesBetweenRows = 75;
+    unsigned int framesBetweenRows = 75;
     int timerForNextRow;
     std::vector<unsigned int> availableInvaderers;
 
@@ -248,13 +246,10 @@ namespace octet {
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-      live_invaderers--;
-      score++;
-      if (live_invaderers == 4) {
+       if (++score == 20) {
         invader_velocity *= 4;
-      } else if (live_invaderers == 0) {
-        game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
+        framesBetweenRows *= 0.25f;
+        timerForNextRow *= 0.25f;
       }
     }
 
@@ -347,6 +342,7 @@ namespace octet {
             if (invaderer.is_enabled() && missile.collides_with(invaderer)) {
               invaderer.is_enabled() = false;
               invaderer.translate(20, 0);
+              availableInvaderers.push_back(first_invaderer_sprite + j);
               missile.is_enabled() = false;
               missile.translate(20, 0);
               on_hit_invaderer();
@@ -478,15 +474,13 @@ namespace octet {
       sprites[game_over_sprite].init(GameOver, 20, 0, 3, 1.5f);
 
       GLuint invaderer = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/invaderer.gif");
-      for (int j = 0; j != num_rows; ++j) {
-        for (int i = 0; i != num_cols; ++i) {
-          assert(first_invaderer_sprite + i + j*num_cols <= last_invaderer_sprite);
-          sprites[first_invaderer_sprite + i + j*num_cols].init(
-            invaderer, 20, 0, 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
-          );
-          sprites[first_invaderer_sprite + i + j*num_cols].is_enabled() = false;
-          availableInvaderers.push_back(first_invaderer_sprite + i + j*num_cols);
-        }
+      for (int i = 0; i != num_invaderers; ++i) {
+        assert(first_invaderer_sprite + i <= last_invaderer_sprite);
+        sprites[first_invaderer_sprite + i].init(
+          invaderer, 20, 0, 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
+        );
+        sprites[first_invaderer_sprite + i].is_enabled() = false;
+        availableInvaderers.push_back(first_invaderer_sprite + i);
       }
 
       // set the border to white for clarity
@@ -522,7 +516,6 @@ namespace octet {
       missiles_disabled = 0;
       bombs_disabled = 50;
       invader_velocity = -0.005f;
-      live_invaderers = num_invaderers;
       num_lives = 3;
       game_over = false;
       score = 0;
