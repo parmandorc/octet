@@ -344,7 +344,7 @@ namespace octet {
             if (invaderer.is_enabled() && missile.collides_with(invaderer)) {
               invaderer.is_enabled() = false;
               invaderer.translate(20, 0);
-              availableInvaderers.push_back(first_invaderer_sprite + j);
+              availableInvaderers.push_back(j);
               missile.is_enabled() = false;
               missile.translate(20, 0);
               on_hit_invaderer();
@@ -412,7 +412,7 @@ namespace octet {
           unsigned int sprite_index = availableInvaderers[0];
           availableInvaderers.erase(availableInvaderers.begin());
 
-          sprite &invaderer = sprites[sprite_index];
+          sprite &invaderer = sprites[first_invaderer_sprite + sprite_index];
           invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
           invaderer.is_enabled() = true;
         }
@@ -504,7 +504,7 @@ namespace octet {
           invaderer, 20, 0, 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
         );
         sprites[first_invaderer_sprite + i].is_enabled() = false;
-        availableInvaderers.push_back(first_invaderer_sprite + i);
+        availableInvaderers.push_back(i);
       }
 
       // set the border to white for clarity
