@@ -228,6 +228,11 @@ namespace octet {
     unsigned int framesBetweenRows = 75;
     int timerForNextRow;
     std::vector<unsigned int> availableInvaderers;
+    enum RowElement{
+      None,
+      Invaderer,
+    };
+    std::vector<std::vector<enum RowElement>> rows;
 
     // random number generator
     class random randomizer;
@@ -485,25 +490,25 @@ namespace octet {
 
       // set the border to white for clarity
       GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
-      sprites[first_border_sprite+0].init(white, 0, -3, 6, 0.2f);
-      sprites[first_border_sprite+1].init(white, 0,  3, 6, 0.2f);
-      sprites[first_border_sprite+2].init(white, -3, 0, 0.2f, 6);
-      sprites[first_border_sprite+3].init(white, 3,  0, 0.2f, 6);
+      sprites[first_border_sprite + 0].init(white, 0, -3, 6, 0.2f);
+      sprites[first_border_sprite + 1].init(white, 0, 3, 6, 0.2f);
+      sprites[first_border_sprite + 2].init(white, -3, 0, 0.2f, 6);
+      sprites[first_border_sprite + 3].init(white, 3, 0, 0.2f, 6);
 
       // use the missile texture
       GLuint missile = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/missile.gif");
       for (int i = 0; i != num_missiles; ++i) {
         // create missiles off-screen
-        sprites[first_missile_sprite+i].init(missile, 20, 0, 0.0625f, 0.25f, true);
-        sprites[first_missile_sprite+i].is_enabled() = false;
+        sprites[first_missile_sprite + i].init(missile, 20, 0, 0.0625f, 0.25f, true);
+        sprites[first_missile_sprite + i].is_enabled() = false;
       }
 
       // use the bomb texture
       GLuint bomb = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/bomb.gif");
       for (int i = 0; i != num_bombs; ++i) {
         // create bombs off-screen
-        sprites[first_bomb_sprite+i].init(bomb, 20, 0, 0.0625f, 0.25f, true, true, vec3(1.0f, 0.0f, 0.0f));
-        sprites[first_bomb_sprite+i].is_enabled() = false;
+        sprites[first_bomb_sprite + i].init(bomb, 20, 0, 0.0625f, 0.25f, true, true, vec3(1.0f, 0.0f, 0.0f));
+        sprites[first_bomb_sprite + i].is_enabled() = false;
       }
 
       // sounds
@@ -519,6 +524,37 @@ namespace octet {
       num_lives = 3;
       game_over = false;
       score = 0;
+
+      //Process the CSV file for row generation
+      //Code copied and modified from: https://github.com/andy-thomason/read_a_csv_file/blob/master/main.cpp
+      std::ifstream is("./invaderers.csv");
+      if (is.good()) {
+        char buffer[256]; // store the line here
+        while (!is.eof()) { // loop over lines
+          is.getline(buffer, sizeof(buffer));
+
+          // loop over columns
+          char *b = buffer;
+          if (*b == '#') continue; //ignore commented lines
+          std::vector<enum RowElement> row;
+          for (int col = 0; ; ++col) {
+            while (*b == ' ' || *b == '\t') ++b; //trim left whitespace
+
+            if (*b == 0 || *b == ',' || *b == '_') {
+              row.push_back(RowElement::None);
+            }
+            else {
+              row.push_back(RowElement::Invaderer);
+            }
+
+            while (*b != 0 && *b != ',') ++b; //trim right whitespace
+            if (*b == ',') ++b;
+            if (*b == 0) break;
+          }
+
+          rows.push_back(row);
+        }
+      }
     }
 
     // called every frame to move things

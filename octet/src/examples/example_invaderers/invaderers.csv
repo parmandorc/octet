@@ -1,0 +1,25 @@
+#Here are specified the positions of enemy invaderers in the game
+#Use a comma as delimiter
+#Use a space, an underscore or an empty cell (no characters) to determine an empty position
+#Use any other character (or multiple characters) to determine that an invaderer will spawn in that position
+#You may determine any number of rows, and rows may have a variable number of columns
+#Empty lines will spawn an empty row
+#Use the following as examples (all lines would have the same ouput):
+# , , , ,x, , , , ,  (notice the final space)
+# , , , ,x, , , , , ,
+#_,_,_,_,x,_,_,_,_,_
+#,,,,invaderer here,,,,,,
+#
+ , , , ,x, , , , , 
+ , , , , , ,x, , , 
+ , , ,x, , , , , , 
+x, , , , , , , , , 
+ , , , , , , ,x, , 
+ , ,x, , , , , , , 
+
+ , , , ,x, , , , , 
+ , , , , ,x,x, , , 
+ , , ,x, , , , , , 
+ , ,x, , , , , , , 
+ , , , , , , ,x, , 
+ , , ,x,x, , , , , 
