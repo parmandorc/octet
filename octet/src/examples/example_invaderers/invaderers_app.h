@@ -210,6 +210,7 @@ namespace octet {
 
     // game state
     bool game_over;
+    bool hardcore_mode;
     unsigned int score;
 
     // speed of enemy
@@ -225,7 +226,7 @@ namespace octet {
     sprite sprites[num_sprites];
 
     //Information for handling new rows of enemies
-    unsigned int framesBetweenRows = 75;
+    unsigned int framesBetweenRows = 40;
     int timerForNextRow;
     std::vector<unsigned int> availableInvaderers;
     enum RowElement{
@@ -251,11 +252,7 @@ namespace octet {
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-       if (++score == 20) {
-        invader_velocity *= 4;
-        framesBetweenRows *= 0.25f;
-        timerForNextRow *= 0.25f;
-      }
+      ++score;
     }
 
     // called when we are hit
@@ -389,21 +386,35 @@ namespace octet {
 
     //Spawn a new row of enemies
     void spawn_invaders() {
+      std::vector<enum RowElement> row;
       if (!rows.empty()) {
         //Pop the next row
-        std::vector<enum RowElement> row = rows[0];
+        row = rows[0];
         rows.erase(rows.begin());
+      }
+      else { 
+        //When finished with designed invaderers, turn to hardcore mode
+        if (!hardcore_mode && availableInvaderers.size() == num_invaderers) {
+          hardcore_mode = true;
+          invader_velocity *= 2;
+          framesBetweenRows *= 0.5f;
+          timerForNextRow *= 0.5f;
+        }
 
-        for (int i = 0; i != row.size() && !availableInvaderers.empty(); ++i) {
-          if (row[i] == RowElement::Invaderer) { //Spawn invaderer in that position
-            //Pop the index for the first available invaderer
-            unsigned int sprite_index = availableInvaderers[0];
-            availableInvaderers.erase(availableInvaderers.begin());
+        if (hardcore_mode) {
+          row = std::vector<enum RowElement>(10, RowElement::Invaderer);
+        }
+      }
 
-            sprite &invaderer = sprites[sprite_index];
-            invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
-            invaderer.is_enabled() = true;
-          }
+      for (int i = 0; i != row.size() && !availableInvaderers.empty(); ++i) {
+        if (row[i] == RowElement::Invaderer) { //Spawn invaderer in that position
+          //Pop the index for the first available invaderer
+          unsigned int sprite_index = availableInvaderers[0];
+          availableInvaderers.erase(availableInvaderers.begin());
+
+          sprite &invaderer = sprites[sprite_index];
+          invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+          invaderer.is_enabled() = true;
         }
       }
     }
@@ -528,9 +539,10 @@ namespace octet {
       // sundry counters and game state.
       missiles_disabled = 0;
       bombs_disabled = 50;
-      invader_velocity = -0.005f;
+      invader_velocity = -0.01f;
       num_lives = 3;
       game_over = false;
+      hardcore_mode = false;
       score = 0;
 
       //Process the CSV file for row generation
