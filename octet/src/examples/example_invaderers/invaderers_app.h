@@ -389,14 +389,22 @@ namespace octet {
 
     //Spawn a new row of enemies
     void spawn_invaders() {
-      for (int i = 0; i != num_cols && !availableInvaderers.empty(); ++i) {
-        //Pop the index for the first available invaderer
-        unsigned int sprite_index = availableInvaderers[0];
-        availableInvaderers.erase(availableInvaderers.begin());
+      if (!rows.empty()) {
+        //Pop the next row
+        std::vector<enum RowElement> row = rows[0];
+        rows.erase(rows.begin());
 
-        sprite &invaderer = sprites[sprite_index];
-        invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
-        invaderer.is_enabled() = true;
+        for (int i = 0; i != row.size() && !availableInvaderers.empty(); ++i) {
+          if (row[i] == RowElement::Invaderer) { //Spawn invaderer in that position
+            //Pop the index for the first available invaderer
+            unsigned int sprite_index = availableInvaderers[0];
+            availableInvaderers.erase(availableInvaderers.begin());
+
+            sprite &invaderer = sprites[sprite_index];
+            invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+            invaderer.is_enabled() = true;
+          }
+        }
       }
     }
 
