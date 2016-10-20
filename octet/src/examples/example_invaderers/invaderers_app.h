@@ -43,6 +43,9 @@ namespace octet {
     // the color (without alpha channel) that the sprite should be tinted with
     vec3 colorTint;
 
+    //Tracks the position of the sprite
+    vec2 position;
+
   public:
     sprite() {
       texture = 0;
@@ -52,6 +55,7 @@ namespace octet {
     void init(int _texture, float x, float y, float w, float h, bool _is3D = false, bool _doApplyTint = false, vec3 _colorTint = vec3(0.0f, 0.0f, 0.0f)) {
       modelToWorld.loadIdentity();
       modelToWorld.translate(x, y, 0);
+      position = vec2(x, y);
       halfWidth = w * 0.5f;
       halfHeight = h * 0.5f;
       texture = _texture;
@@ -123,18 +127,25 @@ namespace octet {
     // move the object
     void translate(float x, float y) {
       modelToWorld.translate(x, y, 0);
+      position += vec2(x, y);
+    }
+
+    vec2 get_position() {
+      return position;
     }
 
     //move the object to the specified position
     void set_position(float x, float y) {
       modelToWorld.loadIdentity();
       modelToWorld.translate(x, y, 0);
+      position = vec2(x, y);
     }
 
     // position the object relative to another.
     void set_relative(sprite &rhs, float x, float y) {
       modelToWorld = rhs.modelToWorld;
       modelToWorld.translate(x, y, 0);
+      position = rhs.position + vec2(x, y);
     }
 
     // return true if this sprite collides with another.
@@ -263,7 +274,15 @@ namespace octet {
 
       if (--num_lives == 0) {
         game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
+        sprites[game_over_sprite].set_position(0, 0);
+      }
+    }
+
+    //Called when an invaderer passes the ship
+    void on_invaderer_pass() {
+      if (--num_lives == 0) {
+        game_over = true;
+        sprites[game_over_sprite].set_position(0, 0);
       }
     }
 
@@ -425,6 +444,14 @@ namespace octet {
         sprite &invaderer = sprites[first_invaderer_sprite+j];
         if (invaderer.is_enabled()) {
           invaderer.translate(dx, dy);
+
+          if (invaderer.get_position()[1] < -3.125f) { //Check if the invaderer passed the ship
+            invaderer.is_enabled() = false;
+            invaderer.translate(20, 0);
+            availableInvaderers.push_back(j);
+
+            on_invaderer_pass();
+          }
         }
       }
     }
