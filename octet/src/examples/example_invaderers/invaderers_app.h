@@ -34,6 +34,9 @@ namespace octet {
     // true if this sprite is enabled.
     bool enabled;
 
+    //True if this sprite has active functionality. (The sprite migth be enabled so it moves, but might not be able to interact with other elements)
+    bool active;
+
     // true if this sprite should be rendered in false 3D
     bool is3D;
 
@@ -63,6 +66,7 @@ namespace octet {
       doApplyTint = _doApplyTint;
       colorTint = _colorTint;
       enabled = true;
+      active = true;
     }
 
     void render(texture_shader &shader, mat4t &cameraToWorld) {
@@ -172,6 +176,10 @@ namespace octet {
 
     bool &is_enabled() {
       return enabled;
+    }
+
+    bool &is_active() {
+      return active;
     }
   };
 
@@ -434,6 +442,7 @@ namespace octet {
           sprite &invaderer = sprites[first_invaderer_sprite + sprite_index];
           invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
           invaderer.is_enabled() = true;
+          invaderer.is_active() = true;
         }
       }
     }
@@ -454,12 +463,15 @@ namespace octet {
             on_hit_ship();
           }
 
-          if (invaderer.get_position()[1] < -3.125f) { //Check if the invaderer passed the ship
+          if (invaderer.is_active() && invaderer.collides_with(sprites[first_border_sprite + 0])) { //Check if the invaderer passed the ship
+            invaderer.is_active() = false;
+            on_invaderer_pass();
+          }
+
+          if (invaderer.get_position()[1] < -3.125f) { //Check if the invaderer is out of screen
             invaderer.is_enabled() = false;
             invaderer.translate(20, 0);
             availableInvaderers.push_back(j);
-
-            on_invaderer_pass();
           }
         }
       }
