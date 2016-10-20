@@ -445,6 +445,15 @@ namespace octet {
         if (invaderer.is_enabled()) {
           invaderer.translate(dx, dy);
 
+          if (invaderer.collides_with(sprites[ship_sprite])) { //Check if the invaderer hit the ship
+            invaderer.is_enabled() = false;
+            invaderer.translate(20, 0);
+            availableInvaderers.push_back(j);
+
+            on_hit_invaderer();
+            on_hit_ship();
+          }
+
           if (invaderer.get_position()[1] < -3.125f) { //Check if the invaderer passed the ship
             invaderer.is_enabled() = false;
             invaderer.translate(20, 0);
