@@ -17,10 +17,10 @@ namespace octet {
     ~example_shapes() {
     }
 
-	int initialCount = 25;
-	int counter = 0;
+	  int initialCount = 25;
+	  int counter = 0;
 	
-	class random randomizer;
+	  class random randomizer;
 
     /// this is called once OpenGL is initialized
     void app_init() {
@@ -32,20 +32,27 @@ namespace octet {
       material *green = new material(vec4(0, 1, 0, 1));
       material *blue = new material(vec4(0, 0, 1, 1));
 
-	  // Left ball
+	    // Left ball
       mat4t mat;
       mat.translate(-3, 15, 0);
       app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 2), red, true);
 
-	  // Cube
+	    // Cube
       mat.loadIdentity();
       mat.translate(0, 10, 0);
       app_scene->add_shape(mat, new mesh_box(vec3(2, 2, 2)), red, true);
 
-	  // Right ball
+	    // Right ball
       mat.loadIdentity();
       mat.translate( 3, 6, 0);
       app_scene->add_shape(mat, new mesh_cylinder(zcylinder(vec3(0, 0, 0), 2, 4)), blue, true);
+
+      // swing
+      mat.loadIdentity();
+      mat.translate(0, 5, 0);
+      mesh_instance *swing = app_scene->add_shape(mat, new mesh_box(vec3(4, 0.5f, 4)), green, true);
+      btHingeConstraint *const1 = new btHingeConstraint(*swing->get_node()->get_rigid_body(), get_btVector3(vec3(0.0f, 0.0f, 0.0f)), get_btVector3(vec3(0.0f, 0.0f, 1.0f)));
+      app_scene->add_constraint(const1);
 
       // ground
       mat.loadIdentity();
@@ -65,16 +72,16 @@ namespace octet {
       // draw the scene
       app_scene->render((float)vx / vy);
 
-	  // spawn new sphere when the counter reaches zero.
-	  if (counter-- <= 0) {
-		  counter = initialCount;
+	    // spawn new sphere when the counter reaches zero.
+	    if (counter-- <= 0) {
+		    counter = initialCount;
 
-		  mat4t mat;
-		  mat.loadIdentity();
-		  mat.translate(0, 20, 0);
-		  mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
-		  newSphere->get_node()->apply_central_force(vec3(randomizer.get(-250.0f, 250.0f), 0.0f, 0.0f));
-	  }
+		    mat4t mat;
+		    mat.loadIdentity();
+		    mat.translate(0, 20, 0);
+		    mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
+		    newSphere->get_node()->apply_central_force(vec3(randomizer.get(-250.0f, 250.0f), 0.0f, 0.0f));
+	    }
     }
   };
 }
