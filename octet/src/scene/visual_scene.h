@@ -334,6 +334,12 @@ namespace octet { namespace scene {
       return result;
     }
 
+    #ifdef OCTET_BULLET
+    void add_constraint(btTypedConstraint *constraint) {
+      world->addConstraint(constraint);
+    }
+    #endif
+
     /// Serialization
     void visit(visitor &v) {
       scene_node::visit(v);
