@@ -17,7 +17,6 @@ namespace octet {
     ~example_shapes() {
     }
 
-	  int initialCount = 25;
 	  int counter = 0;
 	
 	  class random randomizer;
@@ -51,8 +50,31 @@ namespace octet {
       mat.loadIdentity();
       mat.translate(0, 5, 0);
       mesh_instance *swing = app_scene->add_shape(mat, new mesh_box(vec3(4, 0.5f, 4)), green, true);
-      btHingeConstraint *const1 = new btHingeConstraint(*swing->get_node()->get_rigid_body(), get_btVector3(vec3(0.0f, 0.0f, 0.0f)), get_btVector3(vec3(0.0f, 0.0f, 1.0f)));
-      app_scene->add_constraint(const1);
+      btHingeConstraint *hinge = new btHingeConstraint(*swing->get_node()->get_rigid_body(), get_btVector3(vec3(0.0f, 0.0f, 0.0f)), get_btVector3(vec3(0.0f, 0.0f, 1.0f)));
+      app_scene->add_constraint(hinge);
+      
+      // ball with spring
+      mat.loadIdentity();
+      mat.translate(-10, 15, 0);
+      mesh_instance *base = app_scene->add_shape(mat, new mesh_box(vec3(1, 1, 1)), green, false);
+      btTransform frameInBase = btTransform::getIdentity();
+      frameInBase.setOrigin(get_btVector3(vec3(0.0f, -1.0f, 0.0f)));
+      frameInBase.setRotation(btQuaternion(get_btVector3(vec3(1, 0, 0)), M__PI));
+      mat.translate(0, -5, 0);
+      mesh_instance *object = app_scene->add_shape(mat, new mesh_box(vec3(1, 1, 1)), blue, true);
+      btTransform frameInObject = btTransform::getIdentity();
+      frameInObject.setOrigin(get_btVector3(vec3(0.0f, 1.0f, 0.0f)));
+      frameInObject.setRotation(btQuaternion(get_btVector3(vec3(1, 0, 0)), M__PI));
+      btGeneric6DofSpringConstraint *spring = new btGeneric6DofSpringConstraint(*base->get_node()->get_rigid_body(), *object->get_node()->get_rigid_body(), frameInBase, frameInObject, true);
+      spring->setLinearLowerLimit(get_btVector3(vec3(-5.0f, 0.0f, -5.0f)));
+      spring->setLinearUpperLimit(get_btVector3(vec3(5.0f, 10.0f, 5.0f)));
+      for (int i = 0; i < 6; i++) {
+        spring->enableSpring(i, true);
+        spring->setStiffness(i, (i < 3) ? 25.0f : 100.0f);
+        spring->setDamping(i, (i < 3) ? 0.1f : 0.025f);
+      }
+      spring->setEquilibriumPoint(1, 5.0f);
+      app_scene->add_constraint(spring);
 
       // ground
       mat.loadIdentity();
@@ -74,13 +96,13 @@ namespace octet {
 
 	    // spawn new sphere when the counter reaches zero.
 	    if (counter-- <= 0) {
-		    counter = initialCount;
+		    counter = randomizer.get(10, 80);
 
 		    mat4t mat;
 		    mat.loadIdentity();
 		    mat.translate(0, 20, 0);
 		    mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
-		    newSphere->get_node()->apply_central_force(vec3(randomizer.get(-250.0f, 250.0f), 0.0f, 0.0f));
+        newSphere->get_node()->apply_central_force(vec3(randomizer.get(-200.0f, 50.0f), 0.0f, 0.0f));
 	    }
     }
   };
