@@ -21,6 +21,29 @@ namespace octet {
 	
 	  class random randomizer;
 
+    void create_spring(btRigidBody *rbA, btRigidBody *rbB, float length, float plankHalfLength, float stiffness, float damping, float offset = 0.0f) {
+      btTransform frameInA = btTransform::getIdentity();
+      frameInA.setOrigin(get_btVector3(vec3(plankHalfLength, 0.0f, offset)));
+      btTransform frameInB = btTransform::getIdentity();
+      frameInB.setOrigin(get_btVector3(vec3(-plankHalfLength, 0.0f, offset)));
+
+      btGeneric6DofSpringConstraint *spring;
+      if (!rbA || !rbB)
+        spring = new btGeneric6DofSpringConstraint(rbA ? *rbA : *rbB, rbA ? frameInA : frameInB, true);
+      else
+        spring = new btGeneric6DofSpringConstraint(*rbA, *rbB, frameInA, frameInB, true);
+
+      spring->setLinearLowerLimit(get_btVector3(vec3(0.0f, 0.0f, 0.0f)));
+      spring->setLinearUpperLimit(get_btVector3(vec3(length * (rbA ? 1 : -1), 0.0f, 0.0f)));
+      for (int i = 0; i < 6; i++) {
+        spring->enableSpring(i, true);
+        spring->setStiffness(i, stiffness);
+        spring->setDamping(i, damping);
+      }
+      spring->setEquilibriumPoint(0, length * 0.5f * (rbA ? 1 : -1));
+      app_scene->add_constraint(spring);
+    }
+
     /// this is called once OpenGL is initialized
     void app_init() {
       app_scene =  new visual_scene();
@@ -31,50 +54,37 @@ namespace octet {
       material *green = new material(vec4(0, 1, 0, 1));
       material *blue = new material(vec4(0, 0, 1, 1));
 
-	    // Left ball
       mat4t mat;
-      mat.translate(-3, 15, 0);
-      app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 2), red, true);
 
-	    // Cube
-      mat.loadIdentity();
-      mat.translate(0, 10, 0);
-      app_scene->add_shape(mat, new mesh_box(vec3(2, 2, 2)), red, true);
+      //Bridge parameters
+      float plankHalfLength = 1.0f;
+      int numberOfPlanks = 8;
+      float offsetBewteenPlanks = plankHalfLength * 2.0f + (20.0f - plankHalfLength * 2.0f * numberOfPlanks) / (numberOfPlanks - 1);
+      float springLength = 1.0f;
+      float springStiffness = 75.0f;
+      float springDamping = 0.025f;
 
-	    // Right ball
+      //First plank
       mat.loadIdentity();
-      mat.translate( 3, 6, 0);
-      app_scene->add_shape(mat, new mesh_cylinder(zcylinder(vec3(0, 0, 0), 2, 4)), blue, true);
+      mat.translate(-10.0f + plankHalfLength, 10, 0);
+      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plankHalfLength, 0.2f, 5)), red, true);
+      create_spring(NULL, first_plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, 4.0f);
+      create_spring(NULL, first_plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, -4.0f);
+      mat.translate(offsetBewteenPlanks, 0, 0);
 
-      // swing
-      mat.loadIdentity();
-      mat.translate(0, 5, 0);
-      mesh_instance *swing = app_scene->add_shape(mat, new mesh_box(vec3(4, 0.5f, 4)), green, true);
-      btHingeConstraint *hinge = new btHingeConstraint(*swing->get_node()->get_rigid_body(), get_btVector3(vec3(0.0f, 0.0f, 0.0f)), get_btVector3(vec3(0.0f, 0.0f, 1.0f)));
-      app_scene->add_constraint(hinge);
-      
-      // ball with spring
-      mat.loadIdentity();
-      mat.translate(-10, 15, 0);
-      mesh_instance *base = app_scene->add_shape(mat, new mesh_box(vec3(1, 1, 1)), green, false);
-      btTransform frameInBase = btTransform::getIdentity();
-      frameInBase.setOrigin(get_btVector3(vec3(0.0f, -1.0f, 0.0f)));
-      frameInBase.setRotation(btQuaternion(get_btVector3(vec3(1, 0, 0)), M__PI));
-      mat.translate(0, -5, 0);
-      mesh_instance *object = app_scene->add_shape(mat, new mesh_box(vec3(1, 1, 1)), blue, true);
-      btTransform frameInObject = btTransform::getIdentity();
-      frameInObject.setOrigin(get_btVector3(vec3(0.0f, 1.0f, 0.0f)));
-      frameInObject.setRotation(btQuaternion(get_btVector3(vec3(1, 0, 0)), M__PI));
-      btGeneric6DofSpringConstraint *spring = new btGeneric6DofSpringConstraint(*base->get_node()->get_rigid_body(), *object->get_node()->get_rigid_body(), frameInBase, frameInObject, true);
-      spring->setLinearLowerLimit(get_btVector3(vec3(-5.0f, 0.0f, -5.0f)));
-      spring->setLinearUpperLimit(get_btVector3(vec3(5.0f, 10.0f, 5.0f)));
-      for (int i = 0; i < 6; i++) {
-        spring->enableSpring(i, true);
-        spring->setStiffness(i, (i < 3) ? 25.0f : 100.0f);
-        spring->setDamping(i, (i < 3) ? 0.1f : 0.025f);
+      //Planks loop
+      mesh_instance *prev_plank = first_plank;
+      for (int i = 1; i < numberOfPlanks; i++) {
+        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plankHalfLength, 0.2f, 5)), red, true);
+        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, 4.0f);
+        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, -4.0f);
+        mat.translate(offsetBewteenPlanks, 0, 0);
+        prev_plank = plank;
       }
-      spring->setEquilibriumPoint(1, 5.0f);
-      app_scene->add_constraint(spring);
+
+      //Last plank
+      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, springLength, plankHalfLength, springStiffness, springDamping, 4.0f);
+      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, springLength, plankHalfLength, springStiffness, springDamping, -4.0f);
 
       // ground
       mat.loadIdentity();
@@ -102,7 +112,7 @@ namespace octet {
 		    mat.loadIdentity();
 		    mat.translate(0, 20, 0);
 		    mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
-        newSphere->get_node()->apply_central_force(vec3(randomizer.get(-200.0f, 50.0f), 0.0f, 0.0f));
+        newSphere->get_node()->apply_central_force(vec3(randomizer.get(-200.0f, 200.0f), 0.0f, randomizer.get(-100.0f, 100.0f)));
 	    }
     }
   };
