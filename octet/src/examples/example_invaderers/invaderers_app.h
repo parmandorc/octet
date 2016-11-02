@@ -216,6 +216,9 @@ namespace octet {
 
       game_over_sprite,
 
+      normal_button_sprite,
+      hardcore_button_sprite,
+
       num_sprites,
 
     };
@@ -228,8 +231,13 @@ namespace octet {
     int num_lives;
 
     // game state
+    enum {
+      MAIN_MENU,
+      NORMAL,
+      HARDCORE
+    } gamemode;
     bool game_over;
-    bool hardcore_mode;
+    //bool hardcore_mode;
     unsigned int score;
 
     // speed of enemy
@@ -245,7 +253,7 @@ namespace octet {
     sprite sprites[num_sprites];
 
     //Information for handling new rows of enemies
-    unsigned int framesBetweenRows = 40;
+    unsigned int framesBetweenRows;
     int timerForNextRow;
     std::vector<unsigned int> availableInvaderers;
     enum RowElement{
@@ -253,6 +261,7 @@ namespace octet {
       Invaderer,
     };
     std::vector<std::vector<enum RowElement>> rows;
+    int current_row;
 
     // random number generator
     class random randomizer;
@@ -272,6 +281,10 @@ namespace octet {
       alSourcePlay(source);
 
       ++score;
+      if (gamemode == NORMAL && current_row >= rows.size() && availableInvaderers.size() == num_invaderers) {
+        game_over = true;
+        sprites[game_over_sprite].translate(-20, 0);
+      }
     }
 
     // called when we are hit
@@ -282,7 +295,11 @@ namespace octet {
 
       if (--num_lives == 0) {
         game_over = true;
-        sprites[game_over_sprite].set_position(0, 0);
+        sprites[game_over_sprite].translate(-20, 0);
+      }
+
+      if (num_lives < 0) {
+        num_lives = 0;
       }
     }
 
@@ -290,7 +307,11 @@ namespace octet {
     void on_invaderer_pass() {
       if (--num_lives == 0) {
         game_over = true;
-        sprites[game_over_sprite].set_position(0, 0);
+        sprites[game_over_sprite].translate(-20, 0);
+      }
+
+      if (num_lives < 0) {
+        num_lives = 0;
       }
     }
 
@@ -414,23 +435,13 @@ namespace octet {
     //Spawn a new row of enemies
     void spawn_invaders() {
       std::vector<enum RowElement> row;
-      if (!rows.empty()) {
-        //Pop the next row
-        row = rows[0];
-        rows.erase(rows.begin());
+      if (gamemode == NORMAL && current_row < rows.size()) {
+        //Get the next row
+        row = rows[current_row];
+        ++current_row;
       }
-      else { 
-        //When finished with designed invaderers, turn to hardcore mode
-        if (!hardcore_mode && availableInvaderers.size() == num_invaderers) {
-          hardcore_mode = true;
-          invader_velocity *= 2;
-          framesBetweenRows *= 0.5f;
-          timerForNextRow *= 0.5f;
-        }
-
-        if (hardcore_mode) {
-          row = std::vector<enum RowElement>(10, RowElement::Invaderer);
-        }
+      else if (gamemode == HARDCORE) {
+        row = std::vector<enum RowElement>(10, RowElement::Invaderer);
       }
 
       for (int i = 0; i != row.size() && !availableInvaderers.empty(); ++i) {
@@ -472,6 +483,11 @@ namespace octet {
             invaderer.is_enabled() = false;
             invaderer.translate(20, 0);
             availableInvaderers.push_back(j);
+
+            if (gamemode == NORMAL && current_row >= rows.size() && availableInvaderers.size() == num_invaderers) { //Check if game ended with this last invaderer passing
+              game_over = true;
+              sprites[game_over_sprite].translate(-20, 0);
+            }
           }
         }
       }
@@ -503,7 +519,7 @@ namespace octet {
       glScalef(scale, scale, 1);
       glGetFloatv(GL_MODELVIEW_MATRIX, (float*)&tmp);*/
 
-      enum { max_quads = 32 };
+      enum { max_quads = 64 };
       bitmap_font::vertex vertices[max_quads*4];
       uint32_t indices[max_quads*6];
       aabb bb(vec3(0, 0, 0), vec3(256, 256, 0));
@@ -578,6 +594,10 @@ namespace octet {
         sprites[first_bomb_sprite + i].is_enabled() = false;
       }
 
+      //UI sprites
+      sprites[normal_button_sprite].init(white, -1.5f, 0, 1.5f, 0.5f);
+      sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f);
+
       // sounds
       whoosh = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/whoosh.wav");
       bang = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/bang.wav");
@@ -586,12 +606,8 @@ namespace octet {
 
       // sundry counters and game state.
       missiles_disabled = 0;
-      bombs_disabled = 50;
-      invader_velocity = -0.01f;
-      num_lives = 3;
+      gamemode = MAIN_MENU;
       game_over = false;
-      hardcore_mode = false;
-      score = 0;
 
       //Process the CSV file for row generation
       //Code copied and modified from: https://github.com/andy-thomason/read_a_csv_file/blob/master/main.cpp
@@ -625,12 +641,96 @@ namespace octet {
       }
     }
 
+    // Resets the sprites and the game state to the main menu
+    void reset() {
+      game_over = false;
+      sprites[game_over_sprite].translate(20, 0);
+
+      for (int i = 0; i < num_invaderers; ++i) {
+        sprite &invaderer = sprites[first_invaderer_sprite + i];
+        if (invaderer.is_enabled()) {
+          invaderer.translate(20, 0);
+          invaderer.is_enabled() = false;
+          availableInvaderers.push_back(i);
+        }
+      }
+
+      for (int i = 0; i < num_missiles; ++i) {
+        sprite &missile = sprites[first_missile_sprite + i];
+        if (missile.is_enabled()) {
+          missile.translate(20, 0);
+          missile.is_enabled() = false;
+        }
+      }
+
+      for (int i = 0; i < num_bombs; ++i) {
+        sprite &bomb = sprites[first_bomb_sprite + i];
+        if (bomb.is_enabled()) {
+          bomb.translate(20, 0);
+          bomb.is_enabled() = true;
+        }
+      }
+
+      gamemode = MAIN_MENU;
+      sprites[normal_button_sprite].translate(-20, 0);
+      sprites[hardcore_button_sprite].translate(-20, 0);
+    }
+
+    //Handles the selection of the main menu buttons and their actions
+    void handle_main_menu() {
+      if (gamemode != MAIN_MENU)
+        return;
+
+      for (int i = 0; i != num_missiles; ++i) {
+        sprite &missile = sprites[first_missile_sprite + i];
+        if (missile.is_enabled()) {
+          if (missile.collides_with(sprites[normal_button_sprite])) {
+            // Start normal mode
+            gamemode = NORMAL;
+            invader_velocity = -0.01f;
+            num_lives = 3;
+            framesBetweenRows = 40;
+            current_row = 0;
+            goto destroy_missile_and_break;
+          }
+          if (missile.collides_with(sprites[hardcore_button_sprite])) {
+            // Start hardcore mode
+            gamemode = HARDCORE;
+            invader_velocity = -0.02f;
+            num_lives = 3;
+            framesBetweenRows = 20;
+            goto destroy_missile_and_break;
+          }
+          if (false) {
+          destroy_missile_and_break:;
+            missile.is_enabled() = false;
+            missile.translate(20, 0);
+            break;
+          }
+        }
+      }
+
+      if (gamemode != MAIN_MENU) {
+        missiles_disabled = 0;
+        bombs_disabled = 50;
+        score = 0;
+        timerForNextRow = 0;
+
+        sprites[normal_button_sprite].translate(20, 0);
+        sprites[hardcore_button_sprite].translate(20, 0);
+      }
+    }
+
     // called every frame to move things
     void simulate() {
       if (game_over) {
+        if (is_key_down(key_esc))
+          reset();
         return;
       }
 
+      handle_main_menu();
+      
       move_ship();
 
       fire_missiles();
@@ -642,21 +742,13 @@ namespace octet {
       move_bombs();
 
       //Process timer for spawning a new row
-      if (--timerForNextRow <= 0) {
+      if ((gamemode == NORMAL || gamemode == HARDCORE) && --timerForNextRow <= 0) {
         timerForNextRow = framesBetweenRows;
 
         spawn_invaders();
       }
 
       move_invaders(0, invader_velocity);
-
-      /*
-      sprite &border = sprites[first_border_sprite+(invader_velocity < 0 ? 2 : 3)];
-      if (invaders_collide(border)) {
-        invader_velocity = -invader_velocity;
-        move_invaders(invader_velocity, -0.1f);
-      }
-      */
     }
 
     // this is called to draw the world
@@ -682,9 +774,17 @@ namespace octet {
         sprites[i].render(texture_shader_, cameraToWorld);
       }
 
-      char score_text[32];
-      sprintf(score_text, "score: %d   lives: %d\n", score, num_lives);
-      draw_text(texture_shader_, -1.75f, 2, 1.0f/256, score_text);
+      // draw score text
+      if (gamemode != MAIN_MENU) {
+        char score_text[32];
+        sprintf(score_text, "score: %d   lives: %d\n", score, num_lives);
+        draw_text(texture_shader_, -1.75f, 2, 1.0f / 256, score_text);
+      }
+
+      if (game_over) {
+        char *help_text = "Press <Esc> to go back to the main menu.\n";
+        draw_text(texture_shader_, 0, -2.5f, 1.0f / 320, help_text);
+      }
 
       // move the listener with the camera
       vec4 &cpos = cameraToWorld.w();
