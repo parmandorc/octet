@@ -52,6 +52,73 @@ namespace octet {
       app_scene->add_constraint(spring);
     }
 
+    void create_hinge_bridge(mat4t mat, int number_of_planks, float plank_half_length, float hinge_offset, vec4 color = vec4(1, 1, 1, 1)) {
+      material *colormat = new material(color);
+      float offset_bewteen_planks = (plank_half_length + hinge_offset) * 2.0f + (20.0f - (plank_half_length + hinge_offset) * 2.0f * number_of_planks) / (number_of_planks - 1);
+
+      //First plank
+      mat.translate(-10 + plank_half_length + hinge_offset, 0, 0);
+      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
+      btHingeConstraint *hinge = new btHingeConstraint(
+        *first_plank->get_node()->get_rigid_body(), 
+        get_btVector3(vec3(- plank_half_length - hinge_offset, 0, 0)),
+        get_btVector3(vec3(0, 0, 1))
+      );
+      app_scene->add_constraint(hinge);
+      mat.translate(offset_bewteen_planks, 0, 0);
+
+      //Planks loop
+      mesh_instance *prev_plank = first_plank;
+      for (int i = 1; i < number_of_planks; i++) {
+        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
+        hinge = new btHingeConstraint(
+          *prev_plank->get_node()->get_rigid_body(),
+          *plank->get_node()->get_rigid_body(),
+          get_btVector3(vec3(plank_half_length + hinge_offset, 0, 0)),
+          get_btVector3(vec3(- plank_half_length - hinge_offset, 0, 0)),
+          get_btVector3(vec3(0, 0, 1)),
+          get_btVector3(vec3(0, 0, 1))
+        );
+        app_scene->add_constraint(hinge);
+        mat.translate(offset_bewteen_planks, 0, 0);
+        prev_plank = plank;
+      }
+
+      //Last plank
+      hinge = new btHingeConstraint(
+        *prev_plank->get_node()->get_rigid_body(),
+        get_btVector3(vec3(plank_half_length + hinge_offset, 0, 0)),
+        get_btVector3(vec3(0, 0, 1))
+      );
+      app_scene->add_constraint(hinge);
+    }
+
+    void create_spring_bridge(mat4t mat, int number_of_planks, float plank_half_length, float spring_length, float spring_stiffness, float spring_damping, vec4 color = vec4(1, 1, 1, 1)) {
+      material *colormat = new material(color);
+      float offset_bewteen_planks = plank_half_length * 2.0f + (20.0f - plank_half_length * 2.0f * number_of_planks) / (number_of_planks - 1);
+
+      //First plank
+      mat.translate(-10.0f + plank_half_length, 0, 0);
+      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
+      create_spring(NULL, first_plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, 4.0f);
+      create_spring(NULL, first_plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, -4.0f);
+      mat.translate(offset_bewteen_planks, 0, 0);
+
+      //Planks loop
+      mesh_instance *prev_plank = first_plank;
+      for (int i = 1; i < number_of_planks; i++) {
+        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
+        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, 4.0f);
+        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, -4.0f);
+        mat.translate(offset_bewteen_planks, 0, 0);
+        prev_plank = plank;
+      }
+
+      //Last plank
+      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, spring_length, plank_half_length, spring_stiffness, spring_damping, 4.0f);
+      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, spring_length, plank_half_length, spring_stiffness, spring_damping, -4.0f);
+    }
+
     /// this is called once OpenGL is initialized
     void app_init() {
       app_scene =  new visual_scene();
@@ -64,36 +131,13 @@ namespace octet {
       material *blue = new material(vec4(0, 0, 1, 1));
 
       mat4t mat;
-
-      //Bridge parameters
-      float plankHalfLength = 1.0f;
-      int numberOfPlanks = 8;
-      float offsetBewteenPlanks = plankHalfLength * 2.0f + (20.0f - plankHalfLength * 2.0f * numberOfPlanks) / (numberOfPlanks - 1);
-      float springLength = 1.0f;
-      float springStiffness = 75.0f;
-      float springDamping = 0.025f;
-
-      //First plank
       mat.loadIdentity();
-      mat.translate(-10.0f + plankHalfLength, 10, 0);
-      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plankHalfLength, 0.2f, 5)), red, true);
-      create_spring(NULL, first_plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, 4.0f);
-      create_spring(NULL, first_plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, -4.0f);
-      mat.translate(offsetBewteenPlanks, 0, 0);
-
-      //Planks loop
-      mesh_instance *prev_plank = first_plank;
-      for (int i = 1; i < numberOfPlanks; i++) {
-        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plankHalfLength, 0.2f, 5)), red, true);
-        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, 4.0f);
-        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), springLength, plankHalfLength, springStiffness, springDamping, -4.0f);
-        mat.translate(offsetBewteenPlanks, 0, 0);
-        prev_plank = plank;
-      }
-
-      //Last plank
-      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, springLength, plankHalfLength, springStiffness, springDamping, 4.0f);
-      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, springLength, plankHalfLength, springStiffness, springDamping, -4.0f);
+      mat.translate(0, 10, 6);
+      create_spring_bridge(mat, 8, 1.0f, 1.0f, 75.0f, 0.025f, vec4(0.55f, 0.25f, 0.1f, 1));
+      
+      mat.loadIdentity();
+      mat.translate(0, 10, -6);
+      create_hinge_bridge(mat, 8, 1.0f, 0.25f, vec4(0.55f, 0.25f, 0.1f, 1));
 
       // ground
       mat.loadIdentity();
