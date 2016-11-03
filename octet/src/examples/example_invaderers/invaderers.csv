@@ -1,6 +1,7 @@
 #Here are specified the positions of enemy invaderers in the game
 #Use a comma as delimiter
 #Use a space, an underscore or an empty cell (no characters) to determine an empty position
+#Use the letter 'b'/'B' to spawn a boss invaderer
 #Use any other character (or multiple characters) to determine that an invaderer will spawn in that position
 #You may determine any number of rows, and rows may have a variable number of columns
 #Empty lines will spawn an empty row
@@ -24,10 +25,12 @@ x, , , , , , , , ,
  , , , , , , ,x, , 
  , , ,x,x, , , , , 
 
-  , ,x,x,x, , , , , 
+ , ,x,x,x, , , , , 
  , , , ,x,x,x, , , 
  ,x, ,x,x, , , , , 
  , ,x, , ,x, ,x, , 
 x,x,x, , , , ,x,x,x
 x,x, ,x,x, , ,x, ,x
-
+ , , ,x,B,x, , , , 
+ , ,x, ,x, ,x, , , 
+ , , ,x, ,x, , , , 

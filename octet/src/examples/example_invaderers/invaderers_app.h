@@ -152,6 +152,12 @@ namespace octet {
       position = rhs.position + vec2(x, y);
     }
 
+    // changes the size of the sprite
+    void set_size(float w, float h) {
+      halfWidth = w * 0.5f;
+      halfHeight = h * 0.5f;
+    }
+
     // return true if this sprite collides with another.
     // note the "const"s which say we do not modify either sprite
     bool collides_with(const sprite &rhs) const {
@@ -202,6 +208,7 @@ namespace octet {
       // sprite definitions
       ship_sprite = 0,
 
+      boss_sprite,
       first_invaderer_sprite,
       last_invaderer_sprite = first_invaderer_sprite + num_invaderers - 1,
 
@@ -253,15 +260,17 @@ namespace octet {
     sprite sprites[num_sprites];
 
     //Information for handling new rows of enemies
-    unsigned int framesBetweenRows;
-    int timerForNextRow;
-    std::vector<unsigned int> availableInvaderers;
+    unsigned int frames_between_rows;
+    int counter_for_next_row;
+    std::vector<unsigned int> available_invaderers;
     enum RowElement{
       None,
       Invaderer,
+      Boss
     };
     std::vector<std::vector<enum RowElement>> rows;
     int current_row;
+    int boss_lives;
 
     // random number generator
     class random randomizer;
@@ -274,14 +283,22 @@ namespace octet {
 
     ALuint get_sound_source() { return sources[cur_source++ % num_sound_sources]; }
 
+    //returns true if the player won
+    bool is_game_win() {
+      return gamemode == NORMAL && current_row >= rows.size() && available_invaderers.size() == num_invaderers && boss_lives <= 0;
+    }
+
     // called when we hit an enemy
     void on_hit_invaderer() {
       ALuint source = get_sound_source();
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-      ++score;
-      if (gamemode == NORMAL && current_row >= rows.size() && availableInvaderers.size() == num_invaderers) {
+      //add up score
+     ++score;
+
+      //check for game over
+      if (is_game_win()) {
         game_over = true;
         sprites[game_over_sprite].translate(-20, 0);
       }
@@ -293,7 +310,7 @@ namespace octet {
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-      if (--num_lives == 0) {
+      if (--num_lives == 0 && !game_over) {
         game_over = true;
         sprites[game_over_sprite].translate(-20, 0);
       }
@@ -305,13 +322,39 @@ namespace octet {
 
     //Called when an invaderer passes the ship
     void on_invaderer_pass() {
-      if (--num_lives == 0) {
+      if (--num_lives == 0 && !game_over) {
         game_over = true;
         sprites[game_over_sprite].translate(-20, 0);
       }
 
       if (num_lives < 0) {
         num_lives = 0;
+      }
+    }
+
+    //Called when boss hits or passes ship
+    void on_boss_win() {
+      num_lives = 0;
+
+      if (!game_over) {
+        game_over = true;
+        sprites[game_over_sprite].translate(-20, 0);
+      }
+    }
+
+    //Called when hit boss
+    void on_hit_boss() {
+      ALuint source = get_sound_source();
+      alSourcei(source, AL_BUFFER, bang);
+      alSourcePlay(source);
+
+      if (--boss_lives == 0) {
+        score += 10;
+      }
+
+      if (is_game_win()) {
+        game_over = true;
+        sprites[game_over_sprite].translate(-20, 0);
       }
     }
 
@@ -390,16 +433,38 @@ namespace octet {
           for (int j = 0; j != num_invaderers; ++j) {
             sprite &invaderer = sprites[first_invaderer_sprite+j];
             if (invaderer.is_enabled() && missile.collides_with(invaderer)) {
-              invaderer.is_enabled() = false;
-              invaderer.translate(20, 0);
-              availableInvaderers.push_back(j);
               missile.is_enabled() = false;
               missile.translate(20, 0);
+              
+              invaderer.is_enabled() = false;
+              invaderer.translate(20, 0);
+              available_invaderers.push_back(j);
+
               on_hit_invaderer();
 
               goto next_missile;
             }
           }
+
+          //Check is missile hits boss
+          sprite &boss = sprites[boss_sprite];
+          if (boss.is_enabled() && missile.collides_with(boss)) {
+            missile.is_enabled() = false;
+            missile.translate(20, 0);
+
+            on_hit_boss();
+
+            if (boss_lives <= 0) {
+              boss.is_enabled() = false;
+              boss.translate(20, 0);
+            }
+            else {
+              boss.set_size(0.5f + 1.5f * (boss_lives - 1) / 9, 0.5f + 1.5f * (boss_lives - 1) / 9);
+            }
+
+            goto next_missile;
+          }
+
           if (missile.collides_with(sprites[first_border_sprite+1])) {
             missile.is_enabled() = false;
             missile.translate(20, 0);
@@ -444,16 +509,23 @@ namespace octet {
         row = std::vector<enum RowElement>(10, RowElement::Invaderer);
       }
 
-      for (int i = 0; i != row.size() && !availableInvaderers.empty(); ++i) {
+      for (int i = 0; i != row.size() && !available_invaderers.empty(); ++i) {
         if (row[i] == RowElement::Invaderer) { //Spawn invaderer in that position
           //Pop the index for the first available invaderer
-          unsigned int sprite_index = availableInvaderers[0];
-          availableInvaderers.erase(availableInvaderers.begin());
+          unsigned int sprite_index = available_invaderers[0];
+          available_invaderers.erase(available_invaderers.begin());
 
           sprite &invaderer = sprites[first_invaderer_sprite + sprite_index];
           invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
           invaderer.is_enabled() = true;
           invaderer.is_active() = true;
+        }
+        else if (row[i] == RowElement::Boss && !sprites[boss_sprite].is_enabled()) { //Spawn boss if available (only one boss at a time in the world)
+          sprite &boss = sprites[boss_sprite];
+          boss.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.875f);
+          boss.set_size(2.0f, 2.0f);
+          boss_lives = 10;
+          boss.is_enabled() = true;
         }
       }
     }
@@ -468,7 +540,7 @@ namespace octet {
           if (invaderer.collides_with(sprites[ship_sprite])) { //Check if the invaderer hit the ship
             invaderer.is_enabled() = false;
             invaderer.translate(20, 0);
-            availableInvaderers.push_back(j);
+            available_invaderers.push_back(j);
 
             on_hit_invaderer();
             on_hit_ship();
@@ -482,13 +554,27 @@ namespace octet {
           if (invaderer.get_position()[1] < -3.125f) { //Check if the invaderer is out of screen
             invaderer.is_enabled() = false;
             invaderer.translate(20, 0);
-            availableInvaderers.push_back(j);
+            available_invaderers.push_back(j);
 
-            if (gamemode == NORMAL && current_row >= rows.size() && availableInvaderers.size() == num_invaderers) { //Check if game ended with this last invaderer passing
+            if (is_game_win()) { //Check if game ended with this last invaderer passing
               game_over = true;
               sprites[game_over_sprite].translate(-20, 0);
             }
           }
+        }
+      }
+
+      //move boss
+      sprite &boss = sprites[boss_sprite];
+      if (boss.is_enabled()) {
+        boss.translate(dx, dy);
+
+        if (boss.collides_with(sprites[ship_sprite])) {
+          on_hit_ship();
+          on_boss_win();
+        }
+        else if (boss.collides_with(sprites[first_border_sprite + 0])) {
+          on_boss_win();
         }
       }
     }
@@ -503,7 +589,6 @@ namespace octet {
       }
       return false;
     }
-
 
     void draw_text(texture_shader &shader, float x, float y, float scale, const char *text) {
       mat4t modelToWorld;
@@ -568,8 +653,10 @@ namespace octet {
           invaderer, 20, 0, 0.5f, 0.5f, true, true, vec3(1.0f, 0.0f, 0.0f)
         );
         sprites[first_invaderer_sprite + i].is_enabled() = false;
-        availableInvaderers.push_back(i);
+        available_invaderers.push_back(i);
       }
+      sprites[boss_sprite].init(invaderer, 20, 0, 2.0f, 2.0f, true, true, vec3(1.0f, 0.0f, 0.0f));
+      sprites[boss_sprite].is_enabled() = false;
 
       // set the border to white for clarity
       GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
@@ -627,6 +714,9 @@ namespace octet {
             if (*b == 0 || *b == ',' || *b == '_') {
               row.push_back(RowElement::None);
             }
+            else if (*b == 'b' || *b == 'B') {
+              row.push_back(RowElement::Boss);
+            }
             else {
               row.push_back(RowElement::Invaderer);
             }
@@ -651,8 +741,14 @@ namespace octet {
         if (invaderer.is_enabled()) {
           invaderer.translate(20, 0);
           invaderer.is_enabled() = false;
-          availableInvaderers.push_back(i);
+          available_invaderers.push_back(i);
         }
+      }
+
+      sprite &boss = sprites[boss_sprite];
+      if (boss.is_enabled()) {
+        boss.translate(20, 0);
+        boss.is_enabled() = false;
       }
 
       for (int i = 0; i < num_missiles; ++i) {
@@ -689,7 +785,7 @@ namespace octet {
             gamemode = NORMAL;
             invader_velocity = -0.01f;
             num_lives = 3;
-            framesBetweenRows = 40;
+            frames_between_rows = 40;
             current_row = 0;
             goto destroy_missile_and_break;
           }
@@ -698,7 +794,7 @@ namespace octet {
             gamemode = HARDCORE;
             invader_velocity = -0.02f;
             num_lives = 3;
-            framesBetweenRows = 20;
+            frames_between_rows = 20;
             goto destroy_missile_and_break;
           }
           if (false) {
@@ -714,7 +810,8 @@ namespace octet {
         missiles_disabled = 0;
         bombs_disabled = 50;
         score = 0;
-        timerForNextRow = 0;
+        counter_for_next_row = 0;
+        boss_lives = 0;
 
         sprites[normal_button_sprite].translate(20, 0);
         sprites[hardcore_button_sprite].translate(20, 0);
@@ -742,8 +839,8 @@ namespace octet {
       move_bombs();
 
       //Process timer for spawning a new row
-      if ((gamemode == NORMAL || gamemode == HARDCORE) && --timerForNextRow <= 0) {
-        timerForNextRow = framesBetweenRows;
+      if ((gamemode == NORMAL || gamemode == HARDCORE) && --counter_for_next_row <= 0) {
+        counter_for_next_row = frames_between_rows;
 
         spawn_invaders();
       }
