@@ -10,6 +10,14 @@ namespace octet {
     // scene for drawing box
     ref<visual_scene> app_scene;
 
+    //Main camera
+    camera_instance *main_camera;
+    float cam_vert_rot = 0.0f;
+
+    //Mouse position
+    float prev_mx = 0.0f, prev_my = 0.0f;
+    bool was_mouse_down = false;
+
   public:
     example_shapes(int argc, char **argv) : app(argc, argv) {
     }
@@ -48,7 +56,8 @@ namespace octet {
     void app_init() {
       app_scene =  new visual_scene();
       app_scene->create_default_camera_and_lights();
-      app_scene->get_camera_instance(0)->get_node()->translate(vec3(0, 4, 0));
+      main_camera = app_scene->get_camera_instance(0);
+      main_camera->get_node()->translate(vec3(0, 4, 0));
 
       material *red = new material(vec4(1, 0, 0, 1));
       material *green = new material(vec4(0, 1, 0, 1));
@@ -92,28 +101,77 @@ namespace octet {
       app_scene->add_shape(mat, new mesh_box(vec3(200, 1, 200)), green, false);
     }
 
+    //controls player input to move the camera
+    void move_camera() {
+      //Keyboard input
+      float dx = (is_key_down(key_right) || is_key_down('D')) - (is_key_down(key_left) || is_key_down('A'));
+      float dy = is_key_down(key_space) - is_key_down(key_shift);
+      float dz = - (is_key_down(key_up) || is_key_down('W')) + (is_key_down(key_down) || is_key_down('S'));
+      
+      //Process mouse movement (copied and modified from mouse_ball.h)
+      float mdx = 0.0f, mdy = 0.0f;
+      float sensitivity = 50.0f;
+      bool is_mouse_down = is_key_down(key_rmb);
+      if (is_mouse_down) {
+        int mx = 0, my = 0;
+        int vx = 0, vy = 0;
+        get_mouse_pos(mx, my);
+        get_viewport_size(vx, vy);
+        if (was_mouse_down && vx && vy) {
+          float cx = vx * 0.5f;
+          float cy = vy * 0.5f;
+          float pfx = (prev_mx - cx) / vx;
+          float pfy = (prev_my - cy) / vy;
+          float fx = (mx - cx) / vx;
+          float fy = (my - cy) / vy;
+          mdx = (pfx - fx) * sensitivity;
+          mdy = (pfy - fy) * sensitivity;
+        }
+        prev_mx = mx;
+        prev_my = my;
+      }
+      was_mouse_down = is_mouse_down;
+
+      //Move camera
+      main_camera->get_node()->rotate(-cam_vert_rot, vec3(1, 0, 0));
+      main_camera->get_node()->rotate(mdx, vec3(0, 1, 0));
+      main_camera->get_node()->translate(vec3(dx, dy, dz) * 0.5f);
+      if (math::abs(cam_vert_rot + mdy) > 85.0f) { //Lock vertical rotation inside [-85,85]
+        mdy = (85.0f - math::abs(cam_vert_rot)) * (math::abs(cam_vert_rot + mdy) >= 0.0f ? 1.0f : -1.0f);
+      }
+      cam_vert_rot += mdy;
+      main_camera->get_node()->rotate(cam_vert_rot, vec3(1, 0, 0));
+    }
+
+    //update for game logic
+    void simulate() {
+      move_camera();
+
+      // spawn new sphere when the counter reaches zero.
+      if (counter-- <= 0) {
+        counter = randomizer.get(10, 80);
+
+        mat4t mat;
+        mat.loadIdentity();
+        mat.translate(0, 20, 0);
+        mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
+        newSphere->get_node()->apply_central_force(vec3(randomizer.get(-200.0f, 200.0f), 0.0f, randomizer.get(-100.0f, 100.0f)));
+      }
+    }
+
     /// this is called to draw the world
     void draw_world(int x, int y, int w, int h) {
       int vx = 0, vy = 0;
       get_viewport_size(vx, vy);
       app_scene->begin_render(vx, vy);
 
+      simulate();
+
       // update matrices. assume 30 fps.
       app_scene->update(1.0f/30);
 
       // draw the scene
       app_scene->render((float)vx / vy);
-
-	    // spawn new sphere when the counter reaches zero.
-	    if (counter-- <= 0) {
-		    counter = randomizer.get(10, 80);
-
-		    mat4t mat;
-		    mat.loadIdentity();
-		    mat.translate(0, 20, 0);
-		    mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
-        newSphere->get_node()->apply_central_force(vec3(randomizer.get(-200.0f, 200.0f), 0.0f, randomizer.get(-100.0f, 100.0f)));
-	    }
     }
   };
 }
