@@ -29,11 +29,14 @@ namespace octet {
 	
 	  class random randomizer;
 
-    void create_spring(btRigidBody *rbA, btRigidBody *rbB, float length, float plankHalfLength, float stiffness, float damping, float offset = 0.0f) {
+    void create_spring(btRigidBody *rbA, btRigidBody *rbB, float length, float frame_offset_x, 
+        float stiffness, float damping, 
+        float frame_offset_z = 0.0f, bool force_stabilize = false) {
+
       btTransform frameInA = btTransform::getIdentity();
-      frameInA.setOrigin(get_btVector3(vec3(plankHalfLength, 0.0f, offset)));
+      frameInA.setOrigin(get_btVector3(vec3(frame_offset_x, 0.0f, frame_offset_z)));
       btTransform frameInB = btTransform::getIdentity();
-      frameInB.setOrigin(get_btVector3(vec3(-plankHalfLength, 0.0f, offset)));
+      frameInB.setOrigin(get_btVector3(vec3(-frame_offset_x, 0.0f, frame_offset_z)));
 
       btGeneric6DofSpringConstraint *spring;
       if (!rbA || !rbB)
@@ -42,26 +45,29 @@ namespace octet {
         spring = new btGeneric6DofSpringConstraint(*rbA, *rbB, frameInA, frameInB, true);
 
       spring->setLinearLowerLimit(get_btVector3(vec3(0.0f, 0.0f, 0.0f)));
-      spring->setLinearUpperLimit(get_btVector3(vec3(length * (rbA ? 1 : -1), 0.0f, 0.0f)));
-      for (int i = 0; i < 6; i++) {
+      spring->setLinearUpperLimit(get_btVector3(vec3(length, 0.0f, 0.0f)));
+      for (int i = 0; i < (force_stabilize ? 6 : 1); i++) {
         spring->enableSpring(i, true);
         spring->setStiffness(i, stiffness);
         spring->setDamping(i, damping);
       }
-      spring->setEquilibriumPoint(0, length * 0.5f * (rbA ? 1 : -1));
+      spring->setEquilibriumPoint(0, 0);
       app_scene->add_constraint(spring);
     }
 
-    void create_hinge_bridge(mat4t mat, int number_of_planks, float plank_half_length, float hinge_offset, vec4 color = vec4(1, 1, 1, 1)) {
+    void create_hinge_bridge(mat4t mat, float bridge_length, float bridge_width, float plank_half_length, vec4 color, 
+        float curvature_factor = 1.0f, bool force_stabilize = true) {
+
       material *colormat = new material(color);
-      float offset_bewteen_planks = (plank_half_length + hinge_offset) * 2.0f + (20.0f - (plank_half_length + hinge_offset) * 2.0f * number_of_planks) / (number_of_planks - 1);
+      int number_of_planks = int(curvature_factor * bridge_length / (plank_half_length * 2.0f));
+      float offset_bewteen_planks = plank_half_length * 2.0f + (bridge_length - plank_half_length * 2.0f * number_of_planks) / (number_of_planks - 1);
 
       //First plank
-      mat.translate(-10 + plank_half_length + hinge_offset, 0, 0);
-      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
+      mat.translate(- bridge_length * 0.5f + plank_half_length, 0, 0);
+      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, bridge_width * 0.5f)), colormat, true);
       btHingeConstraint *hinge = new btHingeConstraint(
         *first_plank->get_node()->get_rigid_body(), 
-        get_btVector3(vec3(- plank_half_length - hinge_offset, 0, 0)),
+        get_btVector3(vec3(- plank_half_length, 0, 0)),
         get_btVector3(vec3(0, 0, 1))
       );
       app_scene->add_constraint(hinge);
@@ -70,15 +76,17 @@ namespace octet {
       //Planks loop
       mesh_instance *prev_plank = first_plank;
       for (int i = 1; i < number_of_planks; i++) {
-        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
+        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, bridge_width * 0.5f)), colormat, true);
         hinge = new btHingeConstraint(
           *prev_plank->get_node()->get_rigid_body(),
           *plank->get_node()->get_rigid_body(),
-          get_btVector3(vec3(plank_half_length + hinge_offset, 0, 0)),
-          get_btVector3(vec3(- plank_half_length - hinge_offset, 0, 0)),
+          get_btVector3(vec3(plank_half_length, 0, 0)),
+          get_btVector3(vec3(- plank_half_length, 0, 0)),
           get_btVector3(vec3(0, 0, 1)),
           get_btVector3(vec3(0, 0, 1))
         );
+        if (force_stabilize)
+          hinge->setLimit(0, 0);
         app_scene->add_constraint(hinge);
         mat.translate(offset_bewteen_planks, 0, 0);
         prev_plank = plank;
@@ -87,36 +95,40 @@ namespace octet {
       //Last plank
       hinge = new btHingeConstraint(
         *prev_plank->get_node()->get_rigid_body(),
-        get_btVector3(vec3(plank_half_length + hinge_offset, 0, 0)),
+        get_btVector3(vec3(plank_half_length, 0, 0)),
         get_btVector3(vec3(0, 0, 1))
       );
       app_scene->add_constraint(hinge);
     }
 
-    void create_spring_bridge(mat4t mat, int number_of_planks, float plank_half_length, float spring_length, float spring_stiffness, float spring_damping, vec4 color = vec4(1, 1, 1, 1)) {
+    void create_spring_bridge(mat4t mat, float bridge_length, float bridge_width, float plank_half_length, vec4 color,
+        float curvature_factor = 1.0f, float spring_stiffness = 80.0f, float spring_damping = 0.005f, bool force_stabilize = false) {
+
       material *colormat = new material(color);
-      float offset_bewteen_planks = plank_half_length * 2.0f + (20.0f - plank_half_length * 2.0f * number_of_planks) / (number_of_planks - 1);
+      int number_of_planks = int(curvature_factor * bridge_length / (plank_half_length * 2.0f));
+      float offset_bewteen_planks = plank_half_length * 2.0f + (bridge_length - plank_half_length * 2.0f * number_of_planks) / (number_of_planks - 1);
+      float spring_max_length = 50 / spring_stiffness + 0.5f;
 
       //First plank
-      mat.translate(-10.0f + plank_half_length, 0, 0);
-      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
-      create_spring(NULL, first_plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, 4.0f);
-      create_spring(NULL, first_plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, -4.0f);
+      mat.translate(- bridge_length * 0.5f + plank_half_length, 0, 0);
+      mesh_instance *first_plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, bridge_width * 0.5f)), colormat, true);
+      create_spring(NULL, first_plank->get_node()->get_rigid_body(), spring_max_length, plank_half_length, spring_stiffness, spring_damping, 4.0f, force_stabilize);
+      create_spring(NULL, first_plank->get_node()->get_rigid_body(), spring_max_length, plank_half_length, spring_stiffness, spring_damping, -4.0f, force_stabilize);
       mat.translate(offset_bewteen_planks, 0, 0);
 
       //Planks loop
       mesh_instance *prev_plank = first_plank;
       for (int i = 1; i < number_of_planks; i++) {
-        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, 5)), colormat, true);
-        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, 4.0f);
-        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), spring_length, plank_half_length, spring_stiffness, spring_damping, -4.0f);
+        mesh_instance *plank = app_scene->add_shape(mat, new mesh_box(vec3(plank_half_length, 0.2f, bridge_width * 0.5f)), colormat, true);
+        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), spring_max_length, plank_half_length, spring_stiffness, spring_damping, 4.0f, force_stabilize);
+        create_spring(prev_plank->get_node()->get_rigid_body(), plank->get_node()->get_rigid_body(), spring_max_length, plank_half_length, spring_stiffness, spring_damping, -4.0f, force_stabilize);
         mat.translate(offset_bewteen_planks, 0, 0);
         prev_plank = plank;
       }
 
       //Last plank
-      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, spring_length, plank_half_length, spring_stiffness, spring_damping, 4.0f);
-      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, spring_length, plank_half_length, spring_stiffness, spring_damping, -4.0f);
+      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, spring_max_length, plank_half_length, spring_stiffness, spring_damping, 4.0f, force_stabilize);
+      create_spring(prev_plank->get_node()->get_rigid_body(), NULL, spring_max_length, plank_half_length, spring_stiffness, spring_damping, -4.0f, force_stabilize);
     }
 
     /// this is called once OpenGL is initialized
@@ -130,19 +142,28 @@ namespace octet {
       material *green = new material(vec4(0, 1, 0, 1));
       material *blue = new material(vec4(0, 0, 1, 1));
 
+      float river_width = 20.0f;
       mat4t mat;
       mat.loadIdentity();
+      mat.translate(vec3(- river_width * 0.5 - 2.0f, 5, 0));
+      app_scene->add_shape(mat, new mesh_box(vec3(2, 5, 50)), green, false);
+      mat.translate(vec3(river_width + 4.0f, 0, 0));
+      app_scene->add_shape(mat, new mesh_box(vec3(2, 5, 50)), green, false);
+
+      //front bridge
+      mat.loadIdentity();
       mat.translate(0, 10, 6);
-      create_spring_bridge(mat, 8, 1.0f, 1.0f, 75.0f, 0.025f, vec4(0.55f, 0.25f, 0.1f, 1));
-      
+      create_spring_bridge(mat, river_width, 10.0f, 1.0f, vec4(0.55f, 0.25f, 0.1f, 1), 0.8f);
+
+      //back bridge
       mat.loadIdentity();
       mat.translate(0, 10, -6);
-      create_hinge_bridge(mat, 8, 1.0f, 0.25f, vec4(0.55f, 0.25f, 0.1f, 1));
+      create_hinge_bridge(mat, river_width, 10.0f, 1.0f, vec4(0.55f, 0.25f, 0.1f, 1));
 
       // ground
       mat.loadIdentity();
-      mat.translate(0, -1, 0);
-      app_scene->add_shape(mat, new mesh_box(vec3(200, 1, 200)), green, false);
+      mat.translate(0, -10, 0);
+      app_scene->add_shape(mat, new mesh_box(vec3(200, 1, 200)), blue, false);
     }
 
     //controls player input to move the camera
