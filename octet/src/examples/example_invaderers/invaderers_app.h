@@ -946,6 +946,12 @@ namespace octet {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, font_texture);
 
+      GLuint program = shader.get_program();
+      GLint is3DLoc = glGetUniformLocation(program, "is3D");
+      if (is3DLoc != -1) glUniform1i(is3DLoc, false);
+      GLint doApplyTintLoc = glGetUniformLocation(program, "doApplyTint");
+      if (doApplyTintLoc != -1) glUniform1i(doApplyTintLoc, false);
+
       shader.render(modelToProjection, 0);
 
       glVertexAttribPointer(attribute_pos, 3, GL_FLOAT, GL_FALSE, sizeof(bitmap_font::vertex), (void*)&vertices[0].x );
