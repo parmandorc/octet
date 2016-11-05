@@ -2,6 +2,7 @@
 #Use a comma as delimiter
 #Use a space, an underscore or an empty cell (no characters) to determine an empty position
 #Use the letter 'b'/'B' to spawn a boss invaderer
+#Use the letter 'o'/'O' or 'n'/'N' to spawn a nuke pickup
 #Use any other character (or multiple characters) to determine that an invaderer will spawn in that position
 #You may determine any number of rows, and rows may have a variable number of columns
 #Empty lines will spawn an empty row
@@ -14,7 +15,7 @@
  , , , ,x, , , , , 
  , , , , , ,x, , , 
  , , ,x, , , , , , 
-x, , , , , , , , , 
+x, , , , ,O, , , , 
  , , , , , , ,x, , 
  , ,x, , , , , , , 
 
@@ -22,7 +23,7 @@ x, , , , , , , , ,
  , , ,+, ,x,x, , , 
  , , ,x, , , , , , 
  , ,x, , , , , , , 
- , , , , , , ,x, , 
+ ,O, , , , , ,x, , 
  , , ,x,x, ,+, , , 
 
  , ,x,x,x, , , , , 

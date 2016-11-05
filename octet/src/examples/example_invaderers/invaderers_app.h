@@ -172,6 +172,26 @@ namespace octet {
       ;
     }
 
+    // return true if the sprite collides with the specified circle
+    // note: approximation by considering if one of the corners is inside the circle
+    bool collides_with(const float x, const float y, const float r) {
+      float c00_x = modelToWorld[3][0] + halfWidth;
+      float c00_y = modelToWorld[3][1] + halfHeight;
+      float c01_x = modelToWorld[3][0] + halfWidth;
+      float c01_y = modelToWorld[3][1] - halfHeight;
+      float c10_x = modelToWorld[3][0] - halfWidth;
+      float c10_y = modelToWorld[3][1] + halfHeight;
+      float c11_x = modelToWorld[3][0] - halfWidth;
+      float c11_y = modelToWorld[3][1] - halfHeight;
+
+      return
+        ((x - c00_x) * (x - c00_x) + (y - c00_y) * (y - c00_y) < r * r) ||
+        ((x - c01_x) * (x - c01_x) + (y - c01_y) * (y - c01_y) < r * r) ||
+        ((x - c10_x) * (x - c10_x) + (y - c10_y) * (y - c10_y) < r * r) ||
+        ((x - c11_x) * (x - c11_x) + (y - c11_y) * (y - c11_y) < r * r)
+      ;
+    }
+
     bool is_above(const sprite &rhs, float margin) const {
       float dx = rhs.modelToWorld[3][0] - modelToWorld[3][0];
 
@@ -199,36 +219,48 @@ namespace octet {
 
     enum {
       num_sound_sources = 8,
-      //num_cols = 10,
       num_missiles = 2,
+      num_nukes = 2,
       num_bombs = 2,
       num_borders = 4,
       num_invaderers = 100,
       num_heals = 5,
+      num_nuke_pickups = 5,
 
       // sprite definitions
       ship_sprite = 0,
 
+      // entities
       boss_sprite,
       first_invaderer_sprite,
       last_invaderer_sprite = first_invaderer_sprite + num_invaderers - 1,
 
+      // pickups
       first_heal_sprite,
       last_heal_sprite = first_heal_sprite + num_heals - 1,
 
+      first_nuke_pickup_sprite,
+      last_nuke_pickup_sprite = first_nuke_pickup_sprite + num_nuke_pickups - 1,
+
+      // bullets
       first_missile_sprite,
       last_missile_sprite = first_missile_sprite + num_missiles - 1,
 
       first_bomb_sprite,
       last_bomb_sprite = first_bomb_sprite + num_bombs - 1,
 
+      first_nuke_sprite,
+      last_nuke_sprite = first_nuke_sprite + num_nukes - 1,
+
+      // borders
       first_border_sprite,
       last_border_sprite = first_border_sprite + num_borders - 1,
 
+      //GUI
       game_over_sprite,
-
       normal_button_sprite,
       hardcore_button_sprite,
+      nukes_available_sprite,
 
       num_sprites,
 
@@ -236,6 +268,7 @@ namespace octet {
 
     // timers for missiles and bombs
     int missiles_disabled;
+    int nukes_disabled;
     int bombs_disabled;
 
     // accounting for bad guys
@@ -248,7 +281,6 @@ namespace octet {
       HARDCORE
     } gamemode;
     bool game_over;
-    //bool hardcore_mode;
     unsigned int score;
 
     // speed of the elements in the scene
@@ -271,11 +303,15 @@ namespace octet {
       None,
       Invaderer,
       Boss,
-      Heal
+      Heal,
+      Nuke
     };
     std::vector<std::vector<enum RowElement>> rows;
     int current_row;
     int boss_lives;
+
+    // pickups information
+    int nukes_available;
 
     // random number generator
     class random randomizer;
@@ -300,7 +336,7 @@ namespace octet {
       alSourcePlay(source);
 
       //add up score
-     ++score;
+      ++score;
 
       //check for game over
       if (is_game_win()) {
@@ -348,18 +384,55 @@ namespace octet {
     }
 
     //Called when hit boss
-    void on_hit_boss() {
+    void on_hit_boss(int damage = 1) {
       ALuint source = get_sound_source();
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-      if (--boss_lives == 0) {
-        score += 10;
+      if (boss_lives > 0) {
+        boss_lives -= damage;
+        if (boss_lives <= 0) {
+          boss_lives = 0;
+
+          score += 10;
+        }
       }
 
       if (is_game_win()) {
         game_over = true;
         sprites[game_over_sprite].translate(-20, 0);
+      }
+    }
+
+    // process the detonation of a nuke
+    //When collides with an enemy, explodes an kills all enemies in the area
+    void on_nuke_detonation(float x, float y) {
+      ALuint source = get_sound_source();
+      alSourcei(source, AL_BUFFER, bang);
+      alSourcePlay(source);
+
+      for (int i = 0; i != num_invaderers; ++i) { //process affected invaderers
+        sprite &invaderer = sprites[first_invaderer_sprite + i];
+        if (invaderer.is_enabled() && invaderer.collides_with(x, y, 1.25f)) {
+          invaderer.is_enabled() = false;
+          invaderer.translate(20, 0);
+          available_invaderers.push_back(i);
+
+          on_hit_invaderer();
+        }
+      }
+
+      sprite &boss = sprites[boss_sprite]; //check if hit boss
+      if (boss.is_enabled() && boss.collides_with(x, y, 1.25f)) {
+        on_hit_boss(5);
+
+        if (boss_lives <= 0) {
+          boss.is_enabled() = false;
+          boss.translate(20, 0);
+        }
+        else {
+          boss.set_size(0.5f + 1.5f * (boss_lives - 1) / 9, 0.5f + 1.5f * (boss_lives - 1) / 9);
+        }
       }
     }
 
@@ -394,6 +467,29 @@ namespace octet {
             ALuint source = get_sound_source();
             alSourcei(source, AL_BUFFER, whoosh);
             alSourcePlay(source);
+            break;
+          }
+        }
+      }
+    }
+
+    // fire button (x)
+    void fire_nukes() {
+      if (nukes_disabled) {
+        --nukes_disabled;
+      }
+      else if (nukes_available > 0 && is_key_going_down('X')) {
+        // find a nuke
+        for (int i = 0; i != num_nukes; ++i) {
+          if (!sprites[first_nuke_sprite + i].is_enabled()) {
+            sprites[first_nuke_sprite + i].set_relative(sprites[ship_sprite], 0, 0.5f);
+            sprites[first_nuke_sprite + i].is_enabled() = true;
+            nukes_disabled= 5;
+            ALuint source = get_sound_source();
+            alSourcei(source, AL_BUFFER, whoosh);
+            alSourcePlay(source);
+
+            --nukes_available;
             break;
           }
         }
@@ -476,6 +572,50 @@ namespace octet {
           }
         }
       next_missile:;
+      }
+    }
+
+    // animate the nukes
+    void move_nukes() {
+      const float nuke_speed = 0.3f;
+      for (int i = 0; i != num_nukes; ++i) {
+        sprite &nuke = sprites[first_nuke_sprite + i];
+        if (nuke.is_enabled()) {
+          nuke.translate(0, nuke_speed);
+
+          //check if nuke hits an invaderer
+          for (int j = 0; j != num_invaderers; ++j) {
+            sprite &invaderer = sprites[first_invaderer_sprite + j];
+            if (invaderer.is_enabled() && nuke.collides_with(invaderer)) {
+              vec2 centre = nuke.get_position();
+              nuke.is_enabled() = false;
+              nuke.translate(20, 0);
+              
+              on_nuke_detonation(centre[0], centre[1]);
+
+              goto next_nuke;
+            }
+          }
+
+          //check if nuke hits boss
+          sprite &boss = sprites[boss_sprite];
+          if (boss.is_enabled() && nuke.collides_with(boss)) {
+            vec2 centre = nuke.get_position();
+            nuke.is_enabled() = false;
+            nuke.translate(20, 0);
+
+            on_nuke_detonation(centre[0], centre[1]);
+
+            goto next_nuke;
+          }
+
+          //check if nuke hits border
+          if (nuke.collides_with(sprites[first_border_sprite + 1])) {
+            nuke.is_enabled() = false;
+            nuke.translate(20, 0);
+          }
+        }
+      next_nuke:;
       }
     }
 
@@ -564,7 +704,7 @@ namespace octet {
             heal.is_enabled() = false;
             heal.translate(20, 0);
 
-            num_lives++;
+            ++num_lives;
           }
           else if (heal.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
             heal.is_enabled() = false;
@@ -572,6 +712,35 @@ namespace octet {
           }
         }
       }
+    }
+
+    // moves nuke pickups
+    void move_nuke_pickups(float dx, float dy) {
+      for (int i = 0; i != num_nuke_pickups; ++i) {
+        sprite &nuke_pickup = sprites[first_nuke_pickup_sprite + i];
+        if (nuke_pickup.is_enabled()) {
+          nuke_pickup.translate(dx, dy);
+
+          if (nuke_pickup.collides_with(sprites[ship_sprite])) { //Check if the ship picked up the nuke
+            nuke_pickup.is_enabled() = false;
+            nuke_pickup.translate(20, 0);
+
+            ++nukes_available;
+          }
+          else if (nuke_pickup.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
+            nuke_pickup.is_enabled() = false;
+            nuke_pickup.translate(20, 0);
+          }
+        }
+      }
+    }
+
+    // moves the different pickups in the scene
+    void move_pickups(float dx, float dy) {
+
+      move_health_packs(dx, dy);
+
+      move_nuke_pickups(dx, dy);
     }
 
     //Spawn a new row in the scene
@@ -613,6 +782,19 @@ namespace octet {
             if (!heal.is_enabled()) {
               heal.set_position(-2.875f + step * (float)(i + 1), 3.125f);
               heal.is_enabled() = true;
+              break;
+            }
+          }
+        }
+        break;
+
+        case RowElement::Nuke:
+        {
+          for (int j = 0; j < num_nuke_pickups; ++j) { //Spawn health pack
+            sprite &nuke_pickup = sprites[first_nuke_pickup_sprite + j];
+            if (!nuke_pickup.is_enabled()) {
+              nuke_pickup.set_position(-2.875f + step * (float)(i + 1), 3.125f);
+              nuke_pickup.is_enabled() = true;
               break;
             }
           }
@@ -729,6 +911,14 @@ namespace octet {
         sprites[first_missile_sprite + i].is_enabled() = false;
       }
 
+      // use the nuke texture
+      // for now, same texture as missile
+      for (int i = 0; i != num_nukes; ++i) {
+        // create nukes off-screen
+        sprites[first_nuke_sprite + i].init(missile, 20, 0, 0.2f, 0.5f, true, true, vec3(0.75f, 0.75f, 0.75f));
+        sprites[first_nuke_sprite + i].is_enabled() = false;
+      }
+
       // use the bomb texture
       GLuint bomb = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/bomb.gif");
       for (int i = 0; i != num_bombs; ++i) {
@@ -745,9 +935,19 @@ namespace octet {
         sprites[first_heal_sprite + i].is_enabled() = false;
       }
 
-      //UI sprites
+      // use the nuke pickup texture
+      // for now, same texture as nuke bullet
+      for (int i = 0; i != num_nuke_pickups; ++i) {
+        // create nukes off-screen
+        sprites[first_nuke_pickup_sprite + i].init(missile, 20, 0, 0.15f, 0.375f, false, true, vec3(0.75f, 0.75f, 0.75f));
+        sprites[first_nuke_pickup_sprite + i].is_enabled() = false;
+      }
+
+      //GUI sprites
       sprites[normal_button_sprite].init(white, -1.5f, 0, 1.5f, 0.5f);
       sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f);
+      sprites[nukes_available_sprite].init(missile, 2.5f, 2.8f, 0.1f, 0.25f, false, true, vec3(0.75f, 0.75f, 0.75f));
+      sprites[nukes_available_sprite].translate(20, 0);
 
       // sounds
       whoosh = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/whoosh.wav");
@@ -787,6 +987,13 @@ namespace octet {
               row.push_back(RowElement::Heal);
               break;
 
+            case 'o':
+            case 'O':
+            case 'n':
+            case 'N':
+              row.push_back(RowElement::Nuke);
+              break;
+
             case 'b':
             case 'B':
               row.push_back(RowElement::Boss);
@@ -811,6 +1018,7 @@ namespace octet {
       game_over = false;
       sprites[game_over_sprite].translate(20, 0);
 
+      // entities
       for (int i = 0; i < num_invaderers; ++i) {
         sprite &invaderer = sprites[first_invaderer_sprite + i];
         if (invaderer.is_enabled()) {
@@ -826,6 +1034,7 @@ namespace octet {
         boss.is_enabled() = false;
       }
 
+      //bullets
       for (int i = 0; i < num_missiles; ++i) {
         sprite &missile = sprites[first_missile_sprite + i];
         if (missile.is_enabled()) {
@@ -834,6 +1043,14 @@ namespace octet {
         }
       }
 
+      for (int i = 0; i < num_nukes; ++i) {
+        sprite &nuke = sprites[first_nuke_sprite + i];
+        if (nuke.is_enabled()) {
+          nuke.translate(20, 0);
+          nuke.is_enabled() = false;
+        }
+      }
+      
       for (int i = 0; i < num_bombs; ++i) {
         sprite &bomb = sprites[first_bomb_sprite + i];
         if (bomb.is_enabled()) {
@@ -842,6 +1059,7 @@ namespace octet {
         }
       }
 
+      //pickups
       for (int i = 0; i < num_heals; ++i) {
         sprite &heal = sprites[first_heal_sprite + i];
         if (heal.is_enabled()) {
@@ -850,9 +1068,18 @@ namespace octet {
         }
       }
 
+      for (int i = 0; i < num_nuke_pickups; ++i) {
+        sprite &nuke_pickup = sprites[first_nuke_pickup_sprite + i];
+        if (nuke_pickup.is_enabled()) {
+          nuke_pickup.translate(20, 0);
+          nuke_pickup.is_enabled() = true;
+        }
+      }
+
       gamemode = MAIN_MENU;
       sprites[normal_button_sprite].translate(-20, 0);
       sprites[hardcore_button_sprite].translate(-20, 0);
+      sprites[nukes_available_sprite].translate(20, 0);
     }
 
     //Handles the selection of the main menu buttons and their actions
@@ -891,13 +1118,16 @@ namespace octet {
 
       if (gamemode != MAIN_MENU) {
         missiles_disabled = 0;
+        nukes_disabled = 0;
         bombs_disabled = 50;
         score = 0;
         counter_for_next_row = 0;
         boss_lives = 0;
+        nukes_available = 0;
 
         sprites[normal_button_sprite].translate(20, 0);
         sprites[hardcore_button_sprite].translate(20, 0);
+        sprites[nukes_available_sprite].translate(-20, 0);
       }
     }
 
@@ -922,11 +1152,15 @@ namespace octet {
 
       fire_missiles();
 
+      fire_nukes();
+
       fire_bombs();
+
+      move_pickups(0, scene_velocity);
 
       move_missiles();
 
-      move_health_packs(0, scene_velocity);
+      move_nukes();
 
       move_bombs();
 
@@ -963,6 +1197,10 @@ namespace octet {
         char score_text[32];
         sprintf(score_text, "score: %d   lives: %d\n", score, num_lives);
         draw_text(texture_shader_, -1.75f, 2, 1.0f / 256, score_text);
+
+        char nukes_text[32];
+        sprintf(nukes_text, "x%d\n", nukes_available);
+        draw_text(texture_shader_, 3.625f, 2.0f, 1.0f / 256, nukes_text);
       }
 
       if (game_over) {
