@@ -199,7 +199,7 @@ namespace octet {
 
     enum {
       num_sound_sources = 8,
-      num_cols = 10,
+      //num_cols = 10,
       num_missiles = 2,
       num_bombs = 2,
       num_borders = 4,
@@ -586,7 +586,9 @@ namespace octet {
         row = std::vector<enum RowElement>(10, RowElement::Invaderer);
       }
 
-      for (int i = 0; i != row.size(); ++i) {
+      int num_cols = row.size();
+      float step = 5.75f / (num_cols + 1); //factor out so the division is computed only once
+      for (int i = 0; i != num_cols; ++i) {
         switch (row[i]) {
 
         case RowElement::Invaderer: //Spawn invaderer in that position
@@ -597,7 +599,7 @@ namespace octet {
             available_invaderers.erase(available_invaderers.begin());
 
             sprite &invaderer = sprites[first_invaderer_sprite + sprite_index];
-            invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+            invaderer.set_position(-2.875f + step * (float)(i + 1), 3.125f);
             invaderer.is_enabled() = true;
             invaderer.is_active() = true;
           }
@@ -609,7 +611,7 @@ namespace octet {
           for (int j = 0; j < num_heals; ++j) { //Spawn health pack
             sprite &heal = sprites[first_heal_sprite + j];
             if (!heal.is_enabled()) {
-              heal.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+              heal.set_position(-2.875f + step * (float)(i + 1), 3.125f);
               heal.is_enabled() = true;
               break;
             }
@@ -621,7 +623,7 @@ namespace octet {
         {
           if (!sprites[boss_sprite].is_enabled()) { //Spawn boss if available (only one boss at a time in the world)
             sprite &boss = sprites[boss_sprite];
-            boss.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.875f);
+            boss.set_position(-2.875f + step * (float)(i + 1), 3.875f);
             boss.set_size(2.0f, 2.0f);
             boss_lives = 10;
             boss.is_enabled() = true;
