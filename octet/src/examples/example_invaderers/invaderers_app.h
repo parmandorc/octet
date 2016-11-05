@@ -158,6 +158,12 @@ namespace octet {
       halfHeight = h * 0.5f;
     }
 
+    // changes the color tint of the sprite
+    void set_color_tint(bool _doApplyTint, vec3 _colorTint = vec3(0, 0, 0)) {
+      doApplyTint = _doApplyTint;
+      colorTint = _colorTint;
+    }
+
     // return true if this sprite collides with another.
     // note the "const"s which say we do not modify either sprite
     bool collides_with(const sprite &rhs) const {
@@ -225,6 +231,7 @@ namespace octet {
       num_borders = 4,
       num_invaderers = 100,
       num_heals = 5,
+      num_powerups = 5,
       num_nuke_pickups = 5,
 
       // sprite definitions
@@ -238,6 +245,9 @@ namespace octet {
       // pickups
       first_heal_sprite,
       last_heal_sprite = first_heal_sprite + num_heals - 1,
+
+      first_powerup_sprite,
+      last_powerup_sprite = first_powerup_sprite + num_powerups - 1,
 
       first_nuke_pickup_sprite,
       last_nuke_pickup_sprite = first_nuke_pickup_sprite + num_nuke_pickups - 1,
@@ -261,6 +271,7 @@ namespace octet {
       normal_button_sprite,
       hardcore_button_sprite,
       nukes_available_sprite,
+      powerup_available_sprite,
 
       num_sprites,
 
@@ -304,7 +315,8 @@ namespace octet {
       Invaderer,
       Boss,
       Heal,
-      Nuke
+      Powerup,
+      Nuke,
     };
     std::vector<std::vector<enum RowElement>> rows;
     int current_row;
@@ -312,6 +324,8 @@ namespace octet {
 
     // pickups information
     int nukes_available;
+    bool powerup_available;
+    int powerup_left;
 
     // random number generator
     class random randomizer;
@@ -438,7 +452,8 @@ namespace octet {
 
     // use the keyboard to move the ship
     void move_ship() {
-      const float ship_speed = 0.05f;
+      const float ship_speed = powerup_left > 0 ? 0.1f : 0.05f;
+
       // left and right arrows
       if (is_key_down(key_left)) {
         sprites[ship_sprite].translate(-ship_speed, 0);
@@ -449,6 +464,33 @@ namespace octet {
         sprites[ship_sprite].translate(+ship_speed, 0);
         if (sprites[ship_sprite].collides_with(sprites[first_border_sprite+3])) {
           sprites[ship_sprite].translate(-ship_speed, 0);
+        }
+      }
+    }
+
+    void update_powerup() {
+      // launch powerup
+      if (powerup_available && powerup_left <= 0 && is_key_going_down('Z')) {
+        ALuint source = get_sound_source();
+        alSourcei(source, AL_BUFFER, bang); //TO-DO: change sound
+        alSourcePlay(source);
+        sprites[powerup_available_sprite].translate(20, 0);
+
+        powerup_available = false;
+        powerup_left = 75;
+        sprites[ship_sprite].translate(0, 0.125f);
+        sprites[ship_sprite].set_size(0.5f, 0.5f);
+        sprites[ship_sprite].set_color_tint(true, vec3(1.0f, 1.0f, 0.0f));
+      }
+
+      if (powerup_left > 0) {
+        --powerup_left;
+
+        //check if powerup ends
+        if (powerup_left == 0) {
+          sprites[ship_sprite].translate(0, -0.125f);
+          sprites[ship_sprite].set_size(0.25f, 0.25f);
+          sprites[ship_sprite].set_color_tint(false);
         }
       }
     }
@@ -630,7 +672,8 @@ namespace octet {
             bomb.is_enabled() = false;
             bomb.translate(20, 0);
             bombs_disabled = 50;
-            on_hit_ship();
+            if (powerup_left <= 0)
+              on_hit_ship();
             goto next_bomb;
           }
           if (bomb.collides_with(sprites[first_border_sprite+0])) {
@@ -655,7 +698,8 @@ namespace octet {
             available_invaderers.push_back(j);
 
             on_hit_invaderer();
-            on_hit_ship();
+            if (powerup_left <= 0)
+              on_hit_ship();
           }
 
           if (invaderer.is_active() && invaderer.collides_with(sprites[first_border_sprite + 0])) { //Check if the invaderer passed the ship
@@ -704,11 +748,43 @@ namespace octet {
             heal.is_enabled() = false;
             heal.translate(20, 0);
 
+            ALuint source = get_sound_source();
+            alSourcei(source, AL_BUFFER, whoosh); //TO-DO: change sound
+            alSourcePlay(source);
+
             ++num_lives;
           }
           else if (heal.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
             heal.is_enabled() = false;
             heal.translate(20, 0);
+          }
+        }
+      }
+    }
+
+    // moves powerups
+    void move_powerups(float dx, float dy) {
+      for (int i = 0; i != num_powerups; ++i) {
+        sprite &powerup = sprites[first_powerup_sprite + i];
+        if (powerup.is_enabled()) {
+          powerup.translate(dx, dy);
+
+          if (powerup.collides_with(sprites[ship_sprite])) { //Check if the ship picked up the powerup
+            powerup.is_enabled() = false;
+            powerup.translate(20, 0);
+
+            ALuint source = get_sound_source();
+            alSourcei(source, AL_BUFFER, whoosh); //TO-DO: change sound
+            alSourcePlay(source);
+
+            if (!powerup_available)
+              sprites[powerup_available_sprite].translate(-20, 0);
+
+            powerup_available = true;
+          }
+          else if (powerup.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
+            powerup.is_enabled() = false;
+            powerup.translate(20, 0);
           }
         }
       }
@@ -725,6 +801,10 @@ namespace octet {
             nuke_pickup.is_enabled() = false;
             nuke_pickup.translate(20, 0);
 
+            ALuint source = get_sound_source();
+            alSourcei(source, AL_BUFFER, whoosh); //TO-DO: change sound
+            alSourcePlay(source);
+
             ++nukes_available;
           }
           else if (nuke_pickup.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
@@ -739,6 +819,8 @@ namespace octet {
     void move_pickups(float dx, float dy) {
 
       move_health_packs(dx, dy);
+
+      move_powerups(dx, dy);
 
       move_nuke_pickups(dx, dy);
     }
@@ -782,6 +864,19 @@ namespace octet {
             if (!heal.is_enabled()) {
               heal.set_position(-2.875f + step * (float)(i + 1), 3.125f);
               heal.is_enabled() = true;
+              break;
+            }
+          }
+        }
+        break;
+
+        case RowElement::Powerup:
+        {
+          for (int j = 0; j < num_powerups; ++j) { //Spawn health pack
+            sprite &powerup = sprites[first_powerup_sprite + j];
+            if (!powerup.is_enabled()) {
+              powerup.set_position(-2.875f + step * (float)(i + 1), 3.125f);
+              powerup.is_enabled() = true;
               break;
             }
           }
@@ -935,6 +1030,14 @@ namespace octet {
         sprites[first_heal_sprite + i].is_enabled() = false;
       }
 
+      // use the powerup texture
+      // use a yellow texture until texture available
+      for (int i = 0; i != num_powerups; ++i) {
+        // create heals off-screen
+        sprites[first_powerup_sprite + i].init(white, 20, 0, 0.5f, 0.5f, false, true, vec3(1.0f, 1.0f, 0.0f));
+        sprites[first_powerup_sprite + i].is_enabled() = false;
+      }
+
       // use the nuke pickup texture
       // for now, same texture as nuke bullet
       for (int i = 0; i != num_nuke_pickups; ++i) {
@@ -948,6 +1051,8 @@ namespace octet {
       sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f);
       sprites[nukes_available_sprite].init(missile, 2.5f, 2.8f, 0.1f, 0.25f, false, true, vec3(0.75f, 0.75f, 0.75f));
       sprites[nukes_available_sprite].translate(20, 0);
+      sprites[powerup_available_sprite].init(white, 2.15f, 2.8f, 0.175f, 0.175f, false, true, vec3(1.0f, 1.0f, 0.0f));
+      sprites[powerup_available_sprite].translate(20, 0);
 
       // sounds
       whoosh = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/whoosh.wav");
@@ -959,9 +1064,14 @@ namespace octet {
       missiles_disabled = 0;
       gamemode = MAIN_MENU;
       game_over = false;
+      powerup_available = false;
 
-      //Process the CSV file for row generation
-      //Code copied and modified from: https://github.com/andy-thomason/read_a_csv_file/blob/master/main.cpp
+      process_csv_rows();
+    }
+
+    //Process the CSV file for row generation
+    //Code copied and modified from: https://github.com/andy-thomason/read_a_csv_file/blob/master/main.cpp
+    void process_csv_rows() {
       std::ifstream is("./invaderers.csv");
       if (is.good()) {
         char buffer[256]; // store the line here
@@ -985,6 +1095,10 @@ namespace octet {
 
             case '+':
               row.push_back(RowElement::Heal);
+              break;
+
+            case '*':
+              row.push_back(RowElement::Powerup);
               break;
 
             case 'o':
@@ -1076,10 +1190,18 @@ namespace octet {
         }
       }
 
+      //GUI reset
       gamemode = MAIN_MENU;
       sprites[normal_button_sprite].translate(-20, 0);
       sprites[hardcore_button_sprite].translate(-20, 0);
       sprites[nukes_available_sprite].translate(20, 0);
+      if (powerup_available)
+        sprites[powerup_available_sprite].translate(20, 0);
+
+      // player stats
+      nukes_available = 0;
+      powerup_left = 1;
+      powerup_available = false;
     }
 
     //Handles the selection of the main menu buttons and their actions
@@ -1147,6 +1269,8 @@ namespace octet {
 
         spawn_new_row();
       }
+
+      update_powerup();
 
       move_ship();
 
