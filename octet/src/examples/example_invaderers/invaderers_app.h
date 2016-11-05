@@ -204,6 +204,7 @@ namespace octet {
       num_bombs = 2,
       num_borders = 4,
       num_invaderers = 100,
+      num_heals = 5,
 
       // sprite definitions
       ship_sprite = 0,
@@ -211,6 +212,9 @@ namespace octet {
       boss_sprite,
       first_invaderer_sprite,
       last_invaderer_sprite = first_invaderer_sprite + num_invaderers - 1,
+
+      first_heal_sprite,
+      last_heal_sprite = first_heal_sprite + num_heals - 1,
 
       first_missile_sprite,
       last_missile_sprite = first_missile_sprite + num_missiles - 1,
@@ -247,8 +251,8 @@ namespace octet {
     //bool hardcore_mode;
     unsigned int score;
 
-    // speed of enemy
-    float invader_velocity;
+    // speed of the elements in the scene
+    float scene_velocity;
 
     // sounds
     ALuint whoosh;
@@ -266,7 +270,8 @@ namespace octet {
     enum RowElement{
       None,
       Invaderer,
-      Boss
+      Boss,
+      Heal
     };
     std::vector<std::vector<enum RowElement>> rows;
     int current_row;
@@ -497,43 +502,10 @@ namespace octet {
       }
     }
 
-    //Spawn a new row of enemies
-    void spawn_invaders() {
-      std::vector<enum RowElement> row;
-      if (gamemode == NORMAL && current_row < rows.size()) {
-        //Get the next row
-        row = rows[current_row];
-        ++current_row;
-      }
-      else if (gamemode == HARDCORE) {
-        row = std::vector<enum RowElement>(10, RowElement::Invaderer);
-      }
-
-      for (int i = 0; i != row.size() && !available_invaderers.empty(); ++i) {
-        if (row[i] == RowElement::Invaderer) { //Spawn invaderer in that position
-          //Pop the index for the first available invaderer
-          unsigned int sprite_index = available_invaderers[0];
-          available_invaderers.erase(available_invaderers.begin());
-
-          sprite &invaderer = sprites[first_invaderer_sprite + sprite_index];
-          invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
-          invaderer.is_enabled() = true;
-          invaderer.is_active() = true;
-        }
-        else if (row[i] == RowElement::Boss && !sprites[boss_sprite].is_enabled()) { //Spawn boss if available (only one boss at a time in the world)
-          sprite &boss = sprites[boss_sprite];
-          boss.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.875f);
-          boss.set_size(2.0f, 2.0f);
-          boss_lives = 10;
-          boss.is_enabled() = true;
-        }
-      }
-    }
-
     // move the array of enemies
     void move_invaders(float dx, float dy) {
       for (int j = 0; j != num_invaderers; ++j) {
-        sprite &invaderer = sprites[first_invaderer_sprite+j];
+        sprite &invaderer = sprites[first_invaderer_sprite + j];
         if (invaderer.is_enabled()) {
           invaderer.translate(dx, dy);
 
@@ -563,8 +535,10 @@ namespace octet {
           }
         }
       }
+    }
 
-      //move boss
+    //move boss
+    void move_boss(float dx, float dy) {
       sprite &boss = sprites[boss_sprite];
       if (boss.is_enabled()) {
         boss.translate(dx, dy);
@@ -575,6 +549,86 @@ namespace octet {
         }
         else if (boss.collides_with(sprites[first_border_sprite + 0])) {
           on_boss_win();
+        }
+      }
+    }
+
+    // moves health packs
+    void move_health_packs(float dx, float dy) {
+      for (int i = 0; i != num_heals; ++i) {
+        sprite &heal = sprites[first_heal_sprite + i];
+        if (heal.is_enabled()) {
+          heal.translate(dx, dy);
+
+          if (heal.collides_with(sprites[ship_sprite])) { //Check if the ship picked up the health pack
+            heal.is_enabled() = false;
+            heal.translate(20, 0);
+
+            num_lives++;
+          }
+          else if (heal.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
+            heal.is_enabled() = false;
+            heal.translate(20, 0);
+          }
+        }
+      }
+    }
+
+    //Spawn a new row in the scene
+    void spawn_new_row() {
+      std::vector<enum RowElement> row;
+      if (gamemode == NORMAL && current_row < rows.size()) {
+        //Get the next row
+        row = rows[current_row];
+        ++current_row;
+      }
+      else if (gamemode == HARDCORE) {
+        row = std::vector<enum RowElement>(10, RowElement::Invaderer);
+      }
+
+      for (int i = 0; i != row.size(); ++i) {
+        switch (row[i]) {
+
+        case RowElement::Invaderer: //Spawn invaderer in that position
+        {
+          if (!available_invaderers.empty()) {
+            //Pop the index for the first available invaderer
+            unsigned int sprite_index = available_invaderers[0];
+            available_invaderers.erase(available_invaderers.begin());
+
+            sprite &invaderer = sprites[first_invaderer_sprite + sprite_index];
+            invaderer.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+            invaderer.is_enabled() = true;
+            invaderer.is_active() = true;
+          }
+        }
+        break;
+
+        case RowElement::Heal:
+        {
+          for (int j = 0; j < num_heals; ++j) { //Spawn health pack
+            sprite &heal = sprites[first_heal_sprite + j];
+            if (!heal.is_enabled()) {
+              heal.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.125f);
+              heal.is_enabled() = true;
+              break;
+            }
+          }
+        }
+        break;
+
+        case RowElement::Boss:
+        {
+          if (!sprites[boss_sprite].is_enabled()) { //Spawn boss if available (only one boss at a time in the world)
+            sprite &boss = sprites[boss_sprite];
+            boss.set_position(((float)i - num_cols * 0.5f + 0.5f) * 0.5f, 3.875f);
+            boss.set_size(2.0f, 2.0f);
+            boss_lives = 10;
+            boss.is_enabled() = true;
+          }
+        }
+        break;
+
         }
       }
     }
@@ -681,6 +735,14 @@ namespace octet {
         sprites[first_bomb_sprite + i].is_enabled() = false;
       }
 
+      // use the heal texture
+      // use a white texture until texture available
+      for (int i = 0; i != num_heals; ++i) {
+        // create heals off-screen
+        sprites[first_heal_sprite + i].init(white, 20, 0, 0.5f, 0.5f);
+        sprites[first_heal_sprite + i].is_enabled() = false;
+      }
+
       //UI sprites
       sprites[normal_button_sprite].init(white, -1.5f, 0, 1.5f, 0.5f);
       sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f);
@@ -711,13 +773,24 @@ namespace octet {
           for (int col = 0; ; ++col) {
             while (*b == ' ' || *b == '\t') ++b; //trim left whitespace
 
-            if (*b == 0 || *b == ',' || *b == '_') {
+            switch (*b) {
+
+            case 0:
+            case ',':
+            case '_':
               row.push_back(RowElement::None);
-            }
-            else if (*b == 'b' || *b == 'B') {
+              break;
+
+            case '+':
+              row.push_back(RowElement::Heal);
+              break;
+
+            case 'b':
+            case 'B':
               row.push_back(RowElement::Boss);
-            }
-            else {
+              break;
+
+            default:
               row.push_back(RowElement::Invaderer);
             }
 
@@ -732,7 +805,7 @@ namespace octet {
     }
 
     // Resets the sprites and the game state to the main menu
-    void reset() {
+    void reset_scene() {
       game_over = false;
       sprites[game_over_sprite].translate(20, 0);
 
@@ -767,6 +840,14 @@ namespace octet {
         }
       }
 
+      for (int i = 0; i < num_heals; ++i) {
+        sprite &heal = sprites[first_heal_sprite + i];
+        if (heal.is_enabled()) {
+          heal.translate(20, 0);
+          heal.is_enabled() = true;
+        }
+      }
+
       gamemode = MAIN_MENU;
       sprites[normal_button_sprite].translate(-20, 0);
       sprites[hardcore_button_sprite].translate(-20, 0);
@@ -783,7 +864,7 @@ namespace octet {
           if (missile.collides_with(sprites[normal_button_sprite])) {
             // Start normal mode
             gamemode = NORMAL;
-            invader_velocity = -0.01f;
+            scene_velocity = -0.01f;
             num_lives = 3;
             frames_between_rows = 40;
             current_row = 0;
@@ -792,7 +873,7 @@ namespace octet {
           if (missile.collides_with(sprites[hardcore_button_sprite])) {
             // Start hardcore mode
             gamemode = HARDCORE;
-            invader_velocity = -0.02f;
+            scene_velocity = -0.02f;
             num_lives = 3;
             frames_between_rows = 20;
             goto destroy_missile_and_break;
@@ -822,12 +903,19 @@ namespace octet {
     void simulate() {
       if (game_over) {
         if (is_key_down(key_esc))
-          reset();
+          reset_scene();
         return;
       }
 
       handle_main_menu();
       
+      //Process timer for spawning a new row
+      if ((gamemode == NORMAL || gamemode == HARDCORE) && --counter_for_next_row <= 0) {
+        counter_for_next_row = frames_between_rows;
+
+        spawn_new_row();
+      }
+
       move_ship();
 
       fire_missiles();
@@ -836,16 +924,13 @@ namespace octet {
 
       move_missiles();
 
+      move_health_packs(0, scene_velocity);
+
       move_bombs();
 
-      //Process timer for spawning a new row
-      if ((gamemode == NORMAL || gamemode == HARDCORE) && --counter_for_next_row <= 0) {
-        counter_for_next_row = frames_between_rows;
+      move_invaders(0, scene_velocity);
 
-        spawn_invaders();
-      }
-
-      move_invaders(0, invader_velocity);
+      move_boss(0, scene_velocity);
     }
 
     // this is called to draw the world
