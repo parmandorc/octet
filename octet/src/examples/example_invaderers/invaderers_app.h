@@ -321,6 +321,7 @@ namespace octet {
     std::vector<std::vector<enum RowElement>> rows;
     int current_row;
     int boss_lives;
+    int boss_disabled;
 
     // pickups information
     int nukes_available;
@@ -825,6 +826,41 @@ namespace octet {
       move_nuke_pickups(dx, dy);
     }
 
+    // builds a row for hardcore mode
+    std::vector<enum RowElement> build_hardcore_row() {
+      std::vector<enum RowElement> row;
+
+      if (boss_disabled > 0)
+        --boss_disabled;
+      if (boss_disabled == 0 && !sprites[boss_sprite].is_enabled() 
+        && randomizer.get(0.0f, 1.0f) < 0.01f + current_row * 0.00025f) { // boss - 1% in every row, with increasing probability
+        row.push_back(RowElement::Boss);
+        boss_disabled = 5;
+      }
+      else {
+        int num_cols = randomizer.get(9, 12); // give variance to columns layout
+        for (int i = 0; i < num_cols; ++i) {
+          if ((boss_disabled == 0 || fabsf(i - 0.5f * (num_cols - 1)) > 2) && // avoid putting elements over the boss
+            randomizer.get(0.0f, 1.0f) < 0.05f + current_row * 0.0015f) { // rows have increasingly more elements
+            float dice = randomizer.get(0.0f, 1.0f);
+            if (dice < 0.025f)
+              row.push_back(RowElement::Heal); // heal - 2.5% in each position
+            else if (dice < 0.05f)
+              row.push_back(RowElement::Nuke); // nuke - 2.5% in each position
+            else if (dice < 0.075f)
+              row.push_back(RowElement::Powerup); // powerup - 2.5% each position
+            else
+              row.push_back(RowElement::Invaderer); // invaderer - 92.5% in each position
+          }
+          else {
+            row.push_back(RowElement::None);
+          }
+        }
+      }
+
+      return row;
+    }
+
     //Spawn a new row in the scene
     void spawn_new_row() {
       std::vector<enum RowElement> row;
@@ -834,7 +870,8 @@ namespace octet {
         ++current_row;
       }
       else if (gamemode == HARDCORE) {
-        row = std::vector<enum RowElement>(10, RowElement::Invaderer);
+        row = build_hardcore_row();
+        ++current_row;
       }
 
       int num_cols = row.size();
@@ -1224,7 +1261,6 @@ namespace octet {
             scene_velocity = -0.01f;
             num_lives = 3;
             frames_between_rows = 40;
-            current_row = 0;
             goto destroy_missile_and_break;
           }
           if (missile.collides_with(sprites[hardcore_button_sprite])) {
@@ -1233,6 +1269,7 @@ namespace octet {
             scene_velocity = -0.02f;
             num_lives = 3;
             frames_between_rows = 20;
+            boss_disabled = 0;
             goto destroy_missile_and_break;
           }
           if (false) {
@@ -1250,6 +1287,7 @@ namespace octet {
         bombs_disabled = 50;
         score = 0;
         counter_for_next_row = 0;
+        current_row = 0;
         boss_lives = 0;
         nukes_available = 0;
 
