@@ -316,6 +316,8 @@ namespace octet {
     // sounds
     ALuint whoosh;
     ALuint bang;
+    ALuint cling;
+    ALuint tap;
     unsigned cur_source;
     ALuint sources[num_sound_sources];
 
@@ -499,7 +501,7 @@ namespace octet {
       // launch powerup
       if (powerup_available && powerup_left <= 0 && is_key_going_down('Z')) {
         ALuint source = get_sound_source();
-        alSourcei(source, AL_BUFFER, bang); //TO-DO: change sound
+        alSourcei(source, AL_BUFFER, cling);
         alSourcePlay(source);
         sprites[powerup_available_sprite].translate(20, 0);
 
@@ -534,7 +536,7 @@ namespace octet {
             sprites[first_missile_sprite+i].is_enabled() = true;
             missiles_disabled = 5;
             ALuint source = get_sound_source();
-            alSourcei(source, AL_BUFFER, whoosh);
+            alSourcei(source, AL_BUFFER, tap);
             alSourcePlay(source);
             break;
           }
@@ -774,7 +776,7 @@ namespace octet {
             heal.translate(20, 0);
 
             ALuint source = get_sound_source();
-            alSourcei(source, AL_BUFFER, whoosh); //TO-DO: change sound
+            alSourcei(source, AL_BUFFER, cling);
             alSourcePlay(source);
 
             ++num_lives;
@@ -799,7 +801,7 @@ namespace octet {
             powerup.translate(20, 0);
 
             ALuint source = get_sound_source();
-            alSourcei(source, AL_BUFFER, whoosh); //TO-DO: change sound
+            alSourcei(source, AL_BUFFER, cling); //TO-DO: change sound
             alSourcePlay(source);
 
             if (!powerup_available)
@@ -827,7 +829,7 @@ namespace octet {
             nuke_pickup.translate(20, 0);
 
             ALuint source = get_sound_source();
-            alSourcei(source, AL_BUFFER, whoosh); //TO-DO: change sound
+            alSourcei(source, AL_BUFFER, cling); //TO-DO: change sound
             alSourcePlay(source);
 
             ++nukes_available;
@@ -1152,6 +1154,8 @@ namespace octet {
       // sounds
       whoosh = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/whoosh.wav");
       bang = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/bang.wav");
+      cling = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/cling.wav");
+      tap = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/tap.wav");
       cur_source = 0;
       alGenSources(num_sound_sources, sources);
 
@@ -1334,6 +1338,9 @@ namespace octet {
             gamemode = NORMAL;
             num_lives = 3;
             frames_between_rows = 40;
+            ALuint source = get_sound_source();
+            alSourcei(source, AL_BUFFER, cling);
+            alSourcePlay(source);
             goto destroy_missile_and_break;
           }
           if (missile.collides_with(sprites[hardcore_button_sprite])) {
@@ -1344,6 +1351,9 @@ namespace octet {
               num_lives = 3;
               frames_between_rows = 20;
               boss_disabled = 0;
+              ALuint source = get_sound_source();
+              alSourcei(source, AL_BUFFER, cling);
+              alSourcePlay(source);
             }
             goto destroy_missile_and_break;
           }
