@@ -1392,7 +1392,6 @@ namespace octet {
         spawn_new_row();
       }
 
-      hardcore_unlocked = true;
       move_background(0, scene_velocity * 50.0f * (gamemode == HARDCORE ? 1.5f : 1.0f));
 
       update_powerup();
