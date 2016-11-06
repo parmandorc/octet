@@ -6,6 +6,27 @@
 //
 namespace octet {
   /// Scene containing a box with octet.
+
+  //Collision callback function
+  /* PLEASE NOTE:
+   * There has been severe problems with the use of the user pointer in the callback function.
+   * Whenever I set the user pointer, fired balls stop updating its render (they would appear
+   *  to stay in their initial position, but their position is actually being updated, as they
+   *  would collide with the bridges and make them move).
+   * I have tried using a struct too, but the problem remains.
+   * I have also tried using the function setUserIndex, but the game would completely crash.
+   * For all these problems, I have decided to leave the code so that I can demonstrate I have the knowledge
+   *  on how to manage callback functions, but comment it so the game keeps working or doesn't crash.
+   */
+  bool contactCallbackFunc(btManifoldPoint& cp,
+    const btCollisionObjectWrapper* colObj0Wrap, int partId0, int index0,
+    const btCollisionObjectWrapper* colObj1Wrap, int partId1, int index1) {
+
+    //mesh_instance *ball = (mesh_instance*)colObj0Wrap->getCollisionObject()->getUserPointer();
+    //ball->set_material(new material(vec4(1.0f, 0.0f, 0.0f, 1.0f)));
+    return false;
+  }
+
   class example_shapes : public app {
     // scene for drawing box
     ref<visual_scene> app_scene;
@@ -137,6 +158,9 @@ namespace octet {
       main_camera->set_far_plane(200.0f);
       
       build_scene();
+
+      //Set collision callback function
+      gContactAddedCallback = contactCallbackFunc;
     }
 
     // reads a csv file to build the scene
@@ -332,6 +356,9 @@ namespace octet {
         mat.translate(0, -2, -2);
         mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true, 1.0f + since_mouse_down * 0.05f);
         newSphere->get_node()->apply_central_force(-mat.z() * 1500.0f * (1.0f + since_mouse_down * 0.1f));
+        //newSphere->get_node()->get_rigid_body()->setUserPointer(newSphere);
+        newSphere->get_node()->get_rigid_body()->setCollisionFlags(newSphere->get_node()->get_rigid_body()->getCollisionFlags() | btCollisionObject::CF_CUSTOM_MATERIAL_CALLBACK);
+
         since_mouse_down = 0;
       }
     }

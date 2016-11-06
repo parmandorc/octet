@@ -340,6 +340,12 @@ namespace octet { namespace scene {
     }
     #endif
 
+    #ifdef OCTET_BULLET
+    void add_callback(btCollisionObject *colObj, btCollisionWorld::ContactResultCallback &resultCallback) {
+      world->contactTest(colObj, resultCallback);
+    }
+    #endif
+
     /// Serialization
     void visit(visitor &v) {
       scene_node::visit(v);
