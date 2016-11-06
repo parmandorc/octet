@@ -278,6 +278,8 @@ namespace octet {
 
       //GUI
       game_over_sprite,
+      win_sprite,
+      title_sprite,
       normal_button_sprite,
       hardcore_button_sprite,
       nukes_available_sprite,
@@ -302,6 +304,7 @@ namespace octet {
       HARDCORE
     } gamemode;
     bool game_over;
+    bool game_win;
     unsigned int score;
     bool hardcore_unlocked;
     unsigned int normal_highscore;
@@ -359,8 +362,8 @@ namespace octet {
 
     // called when win the normal game mode
     void on_game_win() {
-      game_over = true;
-      sprites[game_over_sprite].translate(-20, 0);
+      game_win = true;
+      sprites[win_sprite].translate(-20, 0);
       hardcore_unlocked = true;
       sprites[hardcore_button_sprite].set_color_tint(false);
       if (score > normal_highscore)
@@ -386,7 +389,7 @@ namespace octet {
       //add up score
       ++score;
 
-      //check for game over
+      //check for game win
       if (is_game_win())
         on_game_win();
     }
@@ -397,7 +400,7 @@ namespace octet {
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-      if (--num_lives == 0 && !game_over)
+      if (--num_lives == 0 && !game_over && !game_win)
         on_game_over();
 
       if (num_lives < 0) {
@@ -407,7 +410,7 @@ namespace octet {
 
     //Called when an invaderer passes the ship
     void on_invaderer_pass() {
-      if (--num_lives == 0 && !game_over)
+      if (--num_lives == 0 && !game_over && !game_win)
         on_game_over();
 
       if (num_lives < 0) {
@@ -419,7 +422,7 @@ namespace octet {
     void on_boss_win() {
       num_lives = 0;
 
-      if (!game_over)
+      if (!game_over && !game_win)
         on_game_over();
     }
 
@@ -1056,9 +1059,6 @@ namespace octet {
       GLuint ship = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/ship.gif");
       sprites[ship_sprite].init(ship, 0, -2.75f, 0.25f, 0.25f, true);
 
-      GLuint GameOver = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/GameOver.gif");
-      sprites[game_over_sprite].init(GameOver, 20, 0, 3, 1.5f);
-
       GLuint invaderer = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/invaderer.gif");
       for (int i = 0; i != num_invaderers; ++i) {
         assert(first_invaderer_sprite + i <= last_invaderer_sprite);
@@ -1103,18 +1103,18 @@ namespace octet {
       }
 
       // use the heal texture
-      // use a white texture until texture available
+      GLuint heal = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/life.gif");
       for (int i = 0; i != num_heals; ++i) {
         // create heals off-screen
-        sprites[first_heal_sprite + i].init(white, 20, 0, 0.5f, 0.5f);
+        sprites[first_heal_sprite + i].init(heal, 20, 0, 0.4f, 0.4f, false, true, vec3(0, 1, 0));
         sprites[first_heal_sprite + i].is_enabled() = false;
       }
 
       // use the powerup texture
-      // use a yellow texture until texture available
+      GLuint powerup = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/star.gif");
       for (int i = 0; i != num_powerups; ++i) {
         // create powerups off-screen
-        sprites[first_powerup_sprite + i].init(white, 20, 0, 0.5f, 0.5f, false, true, vec3(1.0f, 1.0f, 0.0f));
+        sprites[first_powerup_sprite + i].init(powerup, 20, 0, 0.4f, 0.4f);
         sprites[first_powerup_sprite + i].is_enabled() = false;
       }
 
@@ -1127,11 +1127,19 @@ namespace octet {
       }
 
       //GUI sprites
-      sprites[normal_button_sprite].init(white, -1.5f, 0, 1.5f, 0.5f);
-      sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f, false, true, vec3(0.5f, 0.5f, 0.5f));
+      GLuint GameOver = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/GameOver.gif");
+      sprites[game_over_sprite].init(GameOver, 20, 0, 3, 1.5f);
+      GLuint win = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/you-win.gif");
+      sprites[win_sprite].init(win, 20, 0, 5, 2);
+      GLuint title = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/invaderers.gif");
+      sprites[title_sprite].init(title, 0.0f, 1.5f, 3.0f, 0.75f);
+      GLuint normal_button = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/normal.gif");
+      sprites[normal_button_sprite].init(normal_button, -1.5f, 0, 1.5f, 0.35f);
+      GLuint hardcore_button = resource_dict::get_texture_handle(GL_RGBA, "assets/invaderers/hardcore.gif");
+      sprites[hardcore_button_sprite].init(hardcore_button, 1.5f, 0, 1.5f, 0.35f, false, true, vec3(0.5f, 0.5f, 0.5f));
       sprites[nukes_available_sprite].init(missile, 2.5f, 2.8f, 0.1f, 0.25f, false, true, vec3(0.75f, 0.75f, 0.75f));
       sprites[nukes_available_sprite].translate(20, 0);
-      sprites[powerup_available_sprite].init(white, 2.15f, 2.8f, 0.175f, 0.175f, false, true, vec3(1.0f, 1.0f, 0.0f));
+      sprites[powerup_available_sprite].init(powerup, 2.15f, 2.8f, 0.175f, 0.175f);
       sprites[powerup_available_sprite].translate(20, 0);
 
       //background sprites
@@ -1151,6 +1159,7 @@ namespace octet {
       missiles_disabled = 0;
       gamemode = MAIN_MENU;
       game_over = false;
+      game_win = false;
       powerup_available = false;
       hardcore_unlocked = false;
       normal_highscore = 0;
@@ -1220,8 +1229,14 @@ namespace octet {
 
     // Resets the sprites and the game state to the main menu
     void reset_scene() {
-      game_over = false;
-      sprites[game_over_sprite].translate(20, 0);
+      if (game_win) {
+        game_win = false;
+        sprites[win_sprite].translate(20, 0);
+      }
+      if (game_over) {
+        game_over = false;
+        sprites[game_over_sprite].translate(20, 0);
+      }
 
       // entities
       for (int i = 0; i < num_invaderers; ++i) {
@@ -1291,6 +1306,7 @@ namespace octet {
 
       //GUI reset
       gamemode = MAIN_MENU;
+      sprites[title_sprite].translate(-20, 0);
       sprites[normal_button_sprite].translate(-20, 0);
       sprites[hardcore_button_sprite].translate(-20, 0);
       sprites[nukes_available_sprite].translate(20, 0);
@@ -1350,6 +1366,7 @@ namespace octet {
         boss_lives = 0;
         nukes_available = 0;
 
+        sprites[title_sprite].translate(20, 0);
         sprites[normal_button_sprite].translate(20, 0);
         sprites[hardcore_button_sprite].translate(20, 0);
         sprites[nukes_available_sprite].translate(-20, 0);
@@ -1358,7 +1375,7 @@ namespace octet {
 
     // called every frame to move things
     void simulate() {
-      if (game_over) {
+      if (game_over || game_win) {
         if (is_key_down(key_esc))
           reset_scene();
         return;
@@ -1432,7 +1449,7 @@ namespace octet {
         draw_text(texture_shader_, 3.625f, 2.0f, 1.0f / 256, nukes_text);
       }
 
-      if (game_over) {
+      if (game_over || game_win) {
         char highscore_text[32];
         sprintf(highscore_text, "Highest score: %d\n", gamemode == NORMAL ? normal_highscore : hardcore_highscore);
         draw_text(texture_shader_, 0.25f, 1, 1.0f / 256, highscore_text);
