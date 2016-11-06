@@ -17,6 +17,7 @@ namespace octet {
     //Mouse position
     float prev_mx = 0.0f, prev_my = 0.0f;
     bool was_mouse_down = false;
+    unsigned int since_mouse_down = 0;
 
   public:
     example_shapes(int argc, char **argv) : app(argc, argv) {
@@ -24,10 +25,6 @@ namespace octet {
 
     ~example_shapes() {
     }
-
-	  int counter = 0;
-	
-	  class random randomizer;
 
     void create_spring(btRigidBody *rbA, btRigidBody *rbB, float length, float frame_offset_x, 
         float stiffness, float damping, 
@@ -137,7 +134,8 @@ namespace octet {
       app_scene->create_default_camera_and_lights();
       main_camera = app_scene->get_camera_instance(0);
       main_camera->get_node()->translate(vec3(0, 4, 0));
-
+      main_camera->set_far_plane(200.0f);
+      
       build_scene();
     }
 
@@ -323,20 +321,26 @@ namespace octet {
       main_camera->get_node()->rotate(cam_vert_rot, vec3(1, 0, 0));
     }
 
+    void fire() {
+      // spawn new sphere
+      if (is_key_down(key_lmb))
+        ++since_mouse_down;
+
+      if (is_key_going_up(key_lmb)) {
+        mat4t mat;
+        mat = main_camera->get_node()->calcModelToWorld();
+        mat.translate(0, -2, -2);
+        mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true, 1.0f + since_mouse_down * 0.05f);
+        newSphere->get_node()->apply_central_force(-mat.z() * 1500.0f * (1.0f + since_mouse_down * 0.1f));
+        since_mouse_down = 0;
+      }
+    }
+
     //update for game logic
     void simulate() {
       move_camera();
 
-      // spawn new sphere when the counter reaches zero.
-      if (counter-- <= 0) {
-        counter = randomizer.get(10, 80);
-
-        mat4t mat;
-        mat.loadIdentity();
-        mat.translate(0, 20, 0);
-        mesh_instance *newSphere = app_scene->add_shape(mat, new mesh_sphere(vec3(2, 2, 2), 1), new material(vec4(0.75f, 0.75f, 0.75f, 1)), true);
-        newSphere->get_node()->apply_central_force(vec3(randomizer.get(-200.0f, 200.0f), 0.0f, randomizer.get(-100.0f, 100.0f)));
-      }
+      fire();
     }
 
     /// this is called to draw the world
