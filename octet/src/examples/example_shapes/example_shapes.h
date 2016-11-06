@@ -138,32 +138,147 @@ namespace octet {
       main_camera = app_scene->get_camera_instance(0);
       main_camera->get_node()->translate(vec3(0, 4, 0));
 
-      material *red = new material(vec4(1, 0, 0, 1));
-      material *green = new material(vec4(0, 1, 0, 1));
-      material *blue = new material(vec4(0, 0, 1, 1));
+      build_scene();
+    }
 
-      float river_width = 20.0f;
+    // reads a csv file to build the scene
+    void build_scene() {
       mat4t mat;
-      mat.loadIdentity();
-      mat.translate(vec3(- river_width * 0.5 - 2.0f, 5, 0));
-      app_scene->add_shape(mat, new mesh_box(vec3(2, 5, 50)), green, false);
-      mat.translate(vec3(river_width + 4.0f, 0, 0));
-      app_scene->add_shape(mat, new mesh_box(vec3(2, 5, 50)), green, false);
+      std::ifstream is("./scene.csv");
+      if (!is.good()) {
+        is.close(); return;
+      }
 
-      //front bridge
-      mat.loadIdentity();
-      mat.translate(0, 10, 6);
-      create_spring_bridge(mat, river_width, 10.0f, 1.0f, vec4(0.55f, 0.25f, 0.1f, 1), 0.8f);
+      // store the line here
+      char buffer[2048];
 
-      //back bridge
-      mat.loadIdentity();
-      mat.translate(0, 10, -6);
-      create_hinge_bridge(mat, river_width, 10.0f, 1.0f, vec4(0.55f, 0.25f, 0.1f, 1));
+      // loop over lines
+      while (!is.eof()) {
+        is.getline(buffer, sizeof(buffer));
 
-      // ground
-      mat.loadIdentity();
-      mat.translate(0, -10, 0);
-      app_scene->add_shape(mat, new mesh_box(vec3(200, 1, 200)), blue, false);
+        // loop over columns
+        char *b = buffer;
+        
+        if (*b == '#') continue; //skip commented line
+
+        // definition data for the object
+        enum {
+          BOX,
+          HINGE_BRIDGE,
+          SPRING_BRIDGE
+        } type;
+        std::vector<float> params;
+
+        // Read CSV line
+        for (int col = 0; ; ++col) {
+          while (*b == ' ' || *b == '\t') ++b;
+          char *e = b;
+          while (*e != 0 && *e != ',' && *e != ' ' && *e != '\t') ++e;
+
+          // now b -> e contains the chars in a column
+          if (col == 0) {
+            std::string type_s = std::string(b, e);
+            if (!type_s.compare("box"))
+              type = BOX;
+            else if (!type_s.compare("hinge_bridge"))
+              type = HINGE_BRIDGE;
+            else if (!type_s.compare("spring_bridge"))
+              type = SPRING_BRIDGE;
+            else
+              break;
+          }
+          else
+            params.push_back(std::atof(b));
+
+          while (*e == ' ' || *e == '\t') ++e;
+          if (*e != ',') break;
+          b = e + 1;
+        }
+
+        //Build the object in the scene
+        mat.loadIdentity();
+
+        switch (type) {
+        case BOX:
+        {
+          if (params.size() >= 6) {
+            float r = 1.0f, g = 1.0f, b = 1.0f, a = 1.0f;
+            if (params.size() >= 9) {
+              r = params[6];
+              g = params[7];
+              b = params[8]; 
+              if (params.size() >= 10)
+                a = params[9];
+            }
+            mat.translate(vec3(params[0], params[1], params[2]));
+            app_scene->add_shape(mat, new mesh_box(vec3(params[3] * 0.5f, params[4] * 0.5f, params[5] * 0.5f)), new material(vec4(r, g, b, a)), false);
+          }
+        }
+        break;
+
+        case HINGE_BRIDGE:
+        {
+          if (params.size() > 6) {
+            float r = 1.0f, g = 1.0f, b = 1.0f, a = 1.0f;
+            float curvature_factor = 1.0f;
+            bool force_stabilize = false;
+            if (params.size() >= 9) {
+              r = params[6];
+              g = params[7];
+              b = params[8];
+              if (params.size() >= 10) {
+                a = params[9];
+                if (params.size() >= 11) {
+                  curvature_factor = params[10];
+                  if (params.size() >= 12) {
+                    force_stabilize = params[11] != 0;
+                  }
+                }
+              }
+            }
+            mat.translate(vec3(params[0], params[1], params[2]));
+            create_hinge_bridge(mat, params[3], params[4], params[5] * 0.5f, vec4(r, g, b, a), curvature_factor, force_stabilize);
+          }
+        }
+        break;
+
+        case SPRING_BRIDGE:
+        {
+          if (params.size() > 6) {
+            float r = 1.0f, g = 1.0f, b = 1.0f, a = 1.0f;
+            float curvature_factor = 1.0f, stiffness = 80.0f, damping = 0.005f;
+            bool force_stabilize = false;
+            if (params.size() >= 9) {
+              r = params[6];
+              g = params[7];
+              b = params[8];
+              if (params.size() >= 10) {
+                a = params[9];
+                if (params.size() >= 11) {
+                  curvature_factor = params[10];
+                  if (params.size() >= 12) {
+                    stiffness = params[11];
+                    if (params.size() >= 13) {
+                      damping = params[12];
+                      if (params.size() >= 14) {
+                        force_stabilize = params[13] != 0;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            mat.translate(vec3(params[0], params[1], params[2]));
+            create_spring_bridge(mat, params[3], params[4], params[5] * 0.5f, vec4(r, g, b, a), 
+              curvature_factor, stiffness, damping, force_stabilize);
+          }
+        }
+        break;
+
+        }
+      }
+
+      is.close();
     }
 
     //controls player input to move the camera

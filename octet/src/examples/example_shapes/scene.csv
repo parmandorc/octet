@@ -1,0 +1,29 @@
+# Type of object, params...
+# box, <x>, <y>, <z>, <width>, <height>, <depth>[, <color_r>, <color_g>, <color_b>[, color_alpha]]
+# hinge_bridge, <x>, <y>, <z>, <length>, <width>, <plank_width>[, <color_r>, <color_g>, <color_b>[, color_alpha[, curvature_factor[, force_stabilize]]]]
+# spring_bridge, <x>, <y>, <z>, <length>, <width>, <plank_width>[, <color_r>, <color_g>, <color_b>[, color_alpha[, curvature_factor[, spring_stiffness[, spring_damping[, force_stabilize]]]]]]
+
+# landscape
+box, 40, -12.5, -37.5, 70, 25, 25, 0, 1, 0
+box, -40, -12.5, -37.5, 70, 25, 25, 0, 1, 0
+box, 43.75, -12.5, -12.5, 62.5, 25, 25, 0, 1, 0
+box, -43.75, -12.5, -12.5, 62.5, 25, 25, 0, 1, 0
+box, 57.5, -12.5, 12.5, 35, 25, 25, 0, 1, 0
+box, -57.5, -12.5, 12.5, 35, 25, 25, 0, 1, 0
+
+# river bottom
+box, 0, -15.625, -37.5, 10, 18.75, 25, 0, 0, 1
+box, 0, -18.75, -12.5, 25, 12.5, 25, 0, 0, 1
+box, 0, -24.5, 12.5, 80, 1, 25, 0, 0, 1
+
+# short bridges
+hinge_bridge, 0, 0, -42.5, 9.75, 5, 1, 0.55, 0.25, 0.1
+spring_bridge, 0, 0, -32.5, 9.75, 5, 1, 0.55, 0.25, 0.1, 1, 0.85, 150, 0.01
+
+# medium bridges
+hinge_bridge, 0, 0, -17.5, 24.75, 5, 1, 0.55, 0.25, 0.1, 1, 0.9
+spring_bridge, 0, 0, -7.5, 24.75, 5, 1, 0.55, 0.25, 0.1, 1, 0.7, 100, 0.25
+
+# long bridges
+hinge_bridge, 0, 0, 7.5, 79.75, 5, 1, 0.55, 0.25, 0.1, 1, 0.65, 1
+spring_bridge, 0, 0, 17.5, 79.75, 5, 1, 0.55, 0.25, 0.1, 1, 0.5, 200, 0.01, 1

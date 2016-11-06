@@ -436,5 +436,8 @@
     <None Include="..\..\resources\resources.inl">
       <Filter>resources</Filter>
     </None>
+    <None Include="scene.csv">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
