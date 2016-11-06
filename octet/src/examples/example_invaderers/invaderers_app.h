@@ -293,6 +293,7 @@ namespace octet {
     } gamemode;
     bool game_over;
     unsigned int score;
+    bool hardcore_unlocked;
 
     // speed of the elements in the scene
     float scene_velocity;
@@ -344,6 +345,14 @@ namespace octet {
       return gamemode == NORMAL && current_row >= rows.size() && available_invaderers.size() == num_invaderers && boss_lives <= 0;
     }
 
+    // called when win the normal game mode
+    void on_game_win() {
+      game_over = true;
+      sprites[game_over_sprite].translate(-20, 0);
+      hardcore_unlocked = true;
+      sprites[hardcore_button_sprite].set_color_tint(false);
+    }
+
     // called when we hit an enemy
     void on_hit_invaderer() {
       ALuint source = get_sound_source();
@@ -354,10 +363,8 @@ namespace octet {
       ++score;
 
       //check for game over
-      if (is_game_win()) {
-        game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
-      }
+      if (is_game_win())
+        on_game_win();
     }
 
     // called when we are hit
@@ -413,10 +420,8 @@ namespace octet {
         }
       }
 
-      if (is_game_win()) {
-        game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
-      }
+      if (is_game_win())
+        on_game_win();
     }
 
     // process the detonation of a nuke
@@ -713,10 +718,8 @@ namespace octet {
             invaderer.translate(20, 0);
             available_invaderers.push_back(j);
 
-            if (is_game_win()) { //Check if game ended with this last invaderer passing
-              game_over = true;
-              sprites[game_over_sprite].translate(-20, 0);
-            }
+            if (is_game_win()) //Check if game ended with this last invaderer passing
+              on_game_win();
           }
         }
       }
@@ -1091,7 +1094,7 @@ namespace octet {
 
       //GUI sprites
       sprites[normal_button_sprite].init(white, -1.5f, 0, 1.5f, 0.5f);
-      sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f);
+      sprites[hardcore_button_sprite].init(white, 1.5f, 0, 1.5f, 0.5f, false, true, vec3(0.5f, 0.5f, 0.5f));
       sprites[nukes_available_sprite].init(missile, 2.5f, 2.8f, 0.1f, 0.25f, false, true, vec3(0.75f, 0.75f, 0.75f));
       sprites[nukes_available_sprite].translate(20, 0);
       sprites[powerup_available_sprite].init(white, 2.15f, 2.8f, 0.175f, 0.175f, false, true, vec3(1.0f, 1.0f, 0.0f));
@@ -1108,6 +1111,7 @@ namespace octet {
       gamemode = MAIN_MENU;
       game_over = false;
       powerup_available = false;
+      hardcore_unlocked = false;
 
       process_csv_rows();
     }
@@ -1273,12 +1277,14 @@ namespace octet {
             goto destroy_missile_and_break;
           }
           if (missile.collides_with(sprites[hardcore_button_sprite])) {
-            // Start hardcore mode
-            gamemode = HARDCORE;
-            scene_velocity = -0.02f;
-            num_lives = 3;
-            frames_between_rows = 20;
-            boss_disabled = 0;
+            if (hardcore_unlocked) {
+              // Start hardcore mode
+              gamemode = HARDCORE;
+              scene_velocity = -0.02f;
+              num_lives = 3;
+              frames_between_rows = 20;
+              boss_disabled = 0;
+            }
             goto destroy_missile_and_break;
           }
           if (false) {
