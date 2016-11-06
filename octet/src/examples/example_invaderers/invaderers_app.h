@@ -1076,7 +1076,7 @@ namespace octet {
       // use the powerup texture
       // use a yellow texture until texture available
       for (int i = 0; i != num_powerups; ++i) {
-        // create heals off-screen
+        // create powerups off-screen
         sprites[first_powerup_sprite + i].init(white, 20, 0, 0.5f, 0.5f, false, true, vec3(1.0f, 1.0f, 0.0f));
         sprites[first_powerup_sprite + i].is_enabled() = false;
       }
@@ -1225,6 +1225,14 @@ namespace octet {
         }
       }
 
+      for (int i = 0; i < num_powerups; ++i) {
+        sprite &powerup = sprites[first_powerup_sprite + i];
+        if (powerup.is_enabled()) {
+          powerup.translate(20, 0);
+          powerup.is_enabled() = true;
+        }
+      }
+
       for (int i = 0; i < num_nuke_pickups; ++i) {
         sprite &nuke_pickup = sprites[first_nuke_pickup_sprite + i];
         if (nuke_pickup.is_enabled()) {
@@ -1243,7 +1251,8 @@ namespace octet {
 
       // player stats
       nukes_available = 0;
-      powerup_left = 1;
+      if (powerup_left > 0)
+        powerup_left = 1;
       powerup_available = false;
     }
 
