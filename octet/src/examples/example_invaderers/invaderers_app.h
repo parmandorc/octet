@@ -325,7 +325,6 @@ namespace octet {
     sprite sprites[num_sprites];
 
     //Information for handling new rows of enemies
-    unsigned int frames_between_rows;
     int counter_for_next_row;
     std::vector<unsigned int> available_invaderers;
     enum RowElement{
@@ -339,7 +338,6 @@ namespace octet {
     std::vector<std::vector<enum RowElement>> rows;
     int current_row;
     int boss_lives;
-    int boss_disabled;
 
     // pickups information
     int nukes_available;
@@ -481,7 +479,7 @@ namespace octet {
 
     // use the keyboard to move the ship
     void move_ship() {
-      const float ship_speed = powerup_left > 0 ? 0.1f : 0.05f;
+      const float ship_speed = powerup_left > 0 ? 0.15f : 0.1f;
 
       // left and right arrows
       if (is_key_down(key_left)) {
@@ -872,18 +870,14 @@ namespace octet {
     std::vector<enum RowElement> build_hardcore_row() {
       std::vector<enum RowElement> row;
 
-      if (boss_disabled > 0)
-        --boss_disabled;
-      if (boss_disabled == 0 && !sprites[boss_sprite].is_enabled() 
-        && randomizer.get(0.0f, 1.0f) < 0.01f + current_row * 0.00025f) { // boss - 1% in every row, with increasing probability
+      if (!sprites[boss_sprite].is_enabled() && randomizer.get(0.0f, 1.0f) < 0.01f + current_row * 0.00025f) { // boss - 1% in every row, with increasing probability
         row.push_back(RowElement::Boss);
-        boss_disabled = 5;
       }
       else {
         int num_cols = randomizer.get(9, 12); // give variance to columns layout
         for (int i = 0; i < num_cols; ++i) {
-          if ((boss_disabled == 0 || fabsf(i - 0.5f * (num_cols - 1)) > 2) && // avoid putting elements over the boss
-            randomizer.get(0.0f, 1.0f) < 0.05f + current_row * 0.0015f) { // rows have increasingly more elements
+          if ((!sprites[boss_sprite].is_enabled() || fabsf(i - 0.5f * (num_cols - 1)) > 2) && // avoid putting elements over the boss
+            randomizer.get(0.0f, 1.0f) < 0.05f + current_row * 0.00025f) { // rows have increasingly more elements
             float dice = randomizer.get(0.0f, 1.0f);
             if (dice < 0.025f)
               row.push_back(RowElement::Heal); // heal - 2.5% in each position
@@ -1168,7 +1162,7 @@ namespace octet {
       hardcore_unlocked = false;
       normal_highscore = 0;
       hardcore_highscore = 0;
-      scene_velocity = -0.01f;
+      scene_velocity = -0.03f;
 
       process_csv_rows();
     }
@@ -1322,7 +1316,7 @@ namespace octet {
       if (powerup_left > 0)
         powerup_left = 1;
       powerup_available = false;
-      scene_velocity = -0.01f;
+      scene_velocity = -0.03f;
     }
 
     //Handles the selection of the main menu buttons and their actions
@@ -1337,7 +1331,6 @@ namespace octet {
             // Start normal mode
             gamemode = NORMAL;
             num_lives = 3;
-            frames_between_rows = 40;
             ALuint source = get_sound_source();
             alSourcei(source, AL_BUFFER, cling);
             alSourcePlay(source);
@@ -1347,10 +1340,7 @@ namespace octet {
             if (hardcore_unlocked) {
               // Start hardcore mode
               gamemode = HARDCORE;
-              scene_velocity = -0.02f;
               num_lives = 3;
-              frames_between_rows = 20;
-              boss_disabled = 0;
               ALuint source = get_sound_source();
               alSourcei(source, AL_BUFFER, cling);
               alSourcePlay(source);
@@ -1391,16 +1381,19 @@ namespace octet {
         return;
       }
 
+      scene_velocity = gamemode == HARDCORE ? -0.045f : -0.03f;
+
       handle_main_menu();
-      
+
       //Process timer for spawning a new row
       if ((gamemode == NORMAL || gamemode == HARDCORE) && --counter_for_next_row <= 0) {
-        counter_for_next_row = frames_between_rows;
+        counter_for_next_row = gamemode == NORMAL ? 16 : 12;
 
         spawn_new_row();
       }
 
-      move_background(0, scene_velocity * 100.0f);
+      hardcore_unlocked = true;
+      move_background(0, scene_velocity * 50.0f * (gamemode == HARDCORE ? 1.5f : 1.0f));
 
       update_powerup();
 
@@ -1422,7 +1415,7 @@ namespace octet {
 
       move_invaders(0, scene_velocity);
 
-      move_boss(0, scene_velocity);
+      move_boss(0, scene_velocity * 0.5f);
     }
 
     // this is called to draw the world
