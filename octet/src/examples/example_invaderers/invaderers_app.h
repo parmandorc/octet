@@ -294,6 +294,8 @@ namespace octet {
     bool game_over;
     unsigned int score;
     bool hardcore_unlocked;
+    unsigned int normal_highscore;
+    unsigned int hardcore_highscore;
 
     // speed of the elements in the scene
     float scene_velocity;
@@ -351,6 +353,18 @@ namespace octet {
       sprites[game_over_sprite].translate(-20, 0);
       hardcore_unlocked = true;
       sprites[hardcore_button_sprite].set_color_tint(false);
+      if (score > normal_highscore)
+        normal_highscore = score;
+    }
+
+    // called on game over
+    void on_game_over() {
+      game_over = true;
+      sprites[game_over_sprite].translate(-20, 0);
+
+      unsigned int *highscore = (gamemode == NORMAL ? &normal_highscore : &hardcore_highscore);
+      if (score > *highscore)
+        *highscore = score;
     }
 
     // called when we hit an enemy
@@ -373,10 +387,8 @@ namespace octet {
       alSourcei(source, AL_BUFFER, bang);
       alSourcePlay(source);
 
-      if (--num_lives == 0 && !game_over) {
-        game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
-      }
+      if (--num_lives == 0 && !game_over)
+        on_game_over();
 
       if (num_lives < 0) {
         num_lives = 0;
@@ -385,10 +397,8 @@ namespace octet {
 
     //Called when an invaderer passes the ship
     void on_invaderer_pass() {
-      if (--num_lives == 0 && !game_over) {
-        game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
-      }
+      if (--num_lives == 0 && !game_over)
+        on_game_over();
 
       if (num_lives < 0) {
         num_lives = 0;
@@ -399,10 +409,8 @@ namespace octet {
     void on_boss_win() {
       num_lives = 0;
 
-      if (!game_over) {
-        game_over = true;
-        sprites[game_over_sprite].translate(-20, 0);
-      }
+      if (!game_over)
+        on_game_over();
     }
 
     //Called when hit boss
@@ -1112,6 +1120,8 @@ namespace octet {
       game_over = false;
       powerup_available = false;
       hardcore_unlocked = false;
+      normal_highscore = 0;
+      hardcore_highscore = 0;
 
       process_csv_rows();
     }
@@ -1381,12 +1391,16 @@ namespace octet {
         sprintf(score_text, "score: %d   lives: %d\n", score, num_lives);
         draw_text(texture_shader_, -1.75f, 2, 1.0f / 256, score_text);
 
-        char nukes_text[32];
+        char nukes_text[8];
         sprintf(nukes_text, "x%d\n", nukes_available);
         draw_text(texture_shader_, 3.625f, 2.0f, 1.0f / 256, nukes_text);
       }
 
       if (game_over) {
+        char highscore_text[32];
+        sprintf(highscore_text, "Highest score: %d\n", gamemode == NORMAL ? normal_highscore : hardcore_highscore);
+        draw_text(texture_shader_, 0.25f, 1, 1.0f / 256, highscore_text);
+
         char *help_text = "Press <Esc> to go back to the main menu.\n";
         draw_text(texture_shader_, 0, -2.5f, 1.0f / 320, help_text);
       }
