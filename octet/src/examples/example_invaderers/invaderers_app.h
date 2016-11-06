@@ -152,6 +152,11 @@ namespace octet {
       position = rhs.position + vec2(x, y);
     }
 
+    void get_size(float *w, float *h) {
+      *w = halfWidth * 2.0f;
+      *h = halfHeight * 2.0f;
+    }
+
     // changes the size of the sprite
     void set_size(float w, float h) {
       halfWidth = w * 0.5f;
@@ -233,9 +238,14 @@ namespace octet {
       num_heals = 5,
       num_powerups = 5,
       num_nuke_pickups = 5,
+      num_background_sprites = 50,
 
       // sprite definitions
       ship_sprite = 0,
+
+      // background
+      first_background_sprite,
+      last_background_sprite = first_background_sprite + num_background_sprites - 1,
 
       // entities
       boss_sprite,
@@ -837,6 +847,22 @@ namespace octet {
       move_nuke_pickups(dx, dy);
     }
 
+    // moves the background
+    void move_background(float dx, float dy) {
+      for (int i = 0; i != num_background_sprites; ++i) {
+        sprite &background_sprite = sprites[first_background_sprite + i];
+        if (background_sprite.is_enabled()) {
+          float w, h;
+          background_sprite.get_size(&w, &h);
+          background_sprite.translate(dx, dy * h);
+
+          if (background_sprite.get_position()[1] < -3.125f) { //Check if the sprite is out of screen
+            background_sprite.translate(0, 6.25f);
+          }
+        }
+      }
+    }
+
     // builds a row for hardcore mode
     std::vector<enum RowElement> build_hardcore_row() {
       std::vector<enum RowElement> row;
@@ -1108,6 +1134,13 @@ namespace octet {
       sprites[powerup_available_sprite].init(white, 2.15f, 2.8f, 0.175f, 0.175f, false, true, vec3(1.0f, 1.0f, 0.0f));
       sprites[powerup_available_sprite].translate(20, 0);
 
+      //background sprites
+      for (int i = 0; i != num_background_sprites; ++i) {
+        float scale = randomizer.get(0.25f, 1.0f);
+        sprites[first_background_sprite + i].init(white, randomizer.get(-3.0f, 3.0f), randomizer.get(-3.0f, 3.0f), 0.0075f * scale, 0.04f * scale);
+        sprites[first_background_sprite + i].is_enabled() = true;
+      }
+      
       // sounds
       whoosh = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/whoosh.wav");
       bang = resource_dict::get_sound_handle(AL_FORMAT_MONO16, "assets/invaderers/bang.wav");
@@ -1122,6 +1155,7 @@ namespace octet {
       hardcore_unlocked = false;
       normal_highscore = 0;
       hardcore_highscore = 0;
+      scene_velocity = -0.01f;
 
       process_csv_rows();
     }
@@ -1268,6 +1302,7 @@ namespace octet {
       if (powerup_left > 0)
         powerup_left = 1;
       powerup_available = false;
+      scene_velocity = -0.01f;
     }
 
     //Handles the selection of the main menu buttons and their actions
@@ -1281,7 +1316,6 @@ namespace octet {
           if (missile.collides_with(sprites[normal_button_sprite])) {
             // Start normal mode
             gamemode = NORMAL;
-            scene_velocity = -0.01f;
             num_lives = 3;
             frames_between_rows = 40;
             goto destroy_missile_and_break;
@@ -1338,6 +1372,8 @@ namespace octet {
 
         spawn_new_row();
       }
+
+      move_background(0, scene_velocity * 100.0f);
 
       update_powerup();
 
