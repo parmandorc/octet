@@ -35,7 +35,7 @@ namespace octet {
       app_scene->add_shape(mat, new mesh_box(vec3(0.1f, 5.0f, 0.1f)), green, false);
       app_scene->add_shape(mat, new mesh_box(vec3(0.1f, 0.1f, 5.0f)), blue, false);
 
-      mat.rotate(30, 0, 1, 0);
+      mat.rotateY(30);
       mat.translate(1, 0, 0);
       app_scene->add_shape(mat, new mesh_box(vec3(2.0f, 0.1f, 0.1f)), red, false);
       app_scene->add_shape(mat, new mesh_box(vec3(0.1f, 2.0f, 0.1f)), green, false);
