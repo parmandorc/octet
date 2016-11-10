@@ -327,7 +327,7 @@ namespace octet { namespace scene {
     
           btRigidBody * rigid_body = new btRigidBody(mass, motionState, shape, inertiaTensor);
           world->addRigidBody(rigid_body);
-          rigid_body->setUserPointer(node);
+          rigid_body->setUserPointer(result);
           node->set_rigid_body(rigid_body);
         }
       #endif
@@ -546,7 +546,7 @@ namespace octet { namespace scene {
         btCollisionObjectArray &array = world->getCollisionObjectArray();
         for (int i = 0; i != array.size(); ++i) {
           btCollisionObject *co = array[i];
-          scene_node *node = (scene_node *)co->getUserPointer();
+          scene_node *node = ((mesh_instance *)co->getUserPointer())->get_node();
           if (node) {
             mat4t &mat = node->access_nodeToParent();
             co->getWorldTransform().getOpenGLMatrix(mat.get());
