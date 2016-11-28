@@ -29,11 +29,11 @@ namespace octet {
       enabled = true;
     }
 
-    sprite* init(int _texture, float x, float y, float w, float h) {
-      modelToWorld.loadIdentity();
-      modelToWorld.translate(x, y, 0);
+    sprite* init(int _texture, mat4t mat, float w, float h) {
       halfWidth = w * 0.5f;
       halfHeight = h * 0.5f;
+      modelToWorld = mat;
+      modelToWorld.translate(0, halfHeight, 0);
       texture = _texture;
       enabled = true;
       return this;
@@ -168,7 +168,16 @@ namespace octet {
       font_texture = resource_dict::get_texture_handle(GL_RGBA, "assets/big_0.gif");
 
       GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
-      sprites.push_back((new sprite())->init(white, 0, 0, 1, 1));
+      mat4t mat;
+      mat.loadIdentity();
+      mat.translate(0, -1, 0);
+      sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
+      mat.translate(0, 1, 0);
+      mat.rotateZ(30);
+      sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
+      mat.translate(0, 1, 0);
+      mat.rotateZ(30);
+      sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
     }
 
     /// this is called to draw the world
