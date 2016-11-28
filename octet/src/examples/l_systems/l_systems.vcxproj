@@ -221,6 +221,14 @@
     <None Include="..\..\resources\mesh_builder.inl" />
     <None Include="..\..\resources\resources.inl" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="config\config1.txt" />
+    <Text Include="config\config2.txt" />
+    <Text Include="config\config3.txt" />
+    <Text Include="config\config4.txt" />
+    <Text Include="config\config5.txt" />
+    <Text Include="config\config6.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

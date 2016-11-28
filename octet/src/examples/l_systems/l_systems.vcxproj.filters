@@ -33,6 +33,9 @@
     <Filter Include="shaders">
       <UniqueIdentifier>{22786083-47af-48b2-98c4-2963f667bc44}</UniqueIdentifier>
     </Filter>
+    <Filter Include="config">
+      <UniqueIdentifier>{af82cf58-1449-4729-9645-3d9a308660ab}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -436,5 +439,25 @@
     <None Include="..\..\resources\resources.inl">
       <Filter>resources</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="config\config1.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="config\config2.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="config\config3.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="config\config4.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="config\config5.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="config\config6.txt">
+      <Filter>config</Filter>
+    </Text>
   </ItemGroup>
 </Project>

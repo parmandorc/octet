@@ -1,0 +1,8 @@
+n = 5
+angle = 22.5
+axiom = X
+rule: X
+	F-[[X]+X]+F[+FX]-X
+rule: F
+	FF
+ignored: X

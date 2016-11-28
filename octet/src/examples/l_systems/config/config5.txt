@@ -1,0 +1,8 @@
+n = 7
+angle = 25.7
+axiom = X
+rule: X
+	F[+X][-X]FX
+rule: F
+	FF
+ignored: X

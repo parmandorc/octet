@@ -151,6 +151,14 @@ namespace octet {
 
   };
 
+  struct config {
+    unsigned int n;
+    float angle;
+    std::string axiom;
+    std::map<char, std::string> rules;
+    std::string ignored;
+  };
+
   /// Scene containing the l-systems app
   class l_systems : public app {
 
@@ -206,13 +214,80 @@ namespace octet {
       glDrawElements(GL_TRIANGLES, num_quads * 6, GL_UNSIGNED_INT, indices);
     }
 
+    bool loadConfigFile(struct config &conf, const char* file) {
+      std::ifstream is(file);
+      if (!is.good()) {
+        is.close(); return false;
+      }
+
+      // store the line here
+      char buffer[256];
+
+      // loop over lines
+      while (!is.eof()) {
+        is.getline(buffer, sizeof(buffer));
+
+        // loop over columns
+        char *b = buffer;
+
+        if (*b == '#') continue; //skip commented line
+
+        // Read parameter
+        while (*b == ' ' || *b == '\t') ++b; //trim white space
+        char *e = b;
+        while (*e != 0 && *e != '=' && *e != ':' && *e != ' ' && *e != '\t') ++e; //get word
+        std::string param = std::string(b, e);
+        b = e + 1;
+        while (*b == ' ' || *b == '\t' || *b == '=' || *b == ':') ++b; //trim white space until value
+        e = b;
+        while (*e != 0 && *e != ' ' && *e != '\t') ++e; //trim white space
+
+        if (!param.compare("n")) {
+          conf.n = std::atoi(b);
+        }
+        else if (!param.compare("angle")) {
+          conf.angle = std::atof(b);
+        }
+        else if (!param.compare("axiom")) {
+          conf.axiom = std::string(b, e);
+        }
+        else if (!param.compare("rule")) {
+          if (!is.eof()) {
+            char c = *b;
+            std::string rule;
+
+            is.getline(buffer, sizeof(buffer));
+            b = buffer;
+            while (*b != 0) {
+              if (*b != ' ' && *b != '\t') {
+                rule += *b;
+              }
+              ++b;
+            }
+            conf.rules[c] = rule;
+          }
+        }
+        else if (!param.compare("ignored")) {
+          while (*b != 0) {
+            if (*b != ' ' && *b != '\t' && *b != ',') {
+              conf.ignored += *b;
+            }
+            ++b;
+          }
+        }
+      }
+
+      is.close();
+      return true;
+    }
+
   public:
     /// this is called when we construct the class before everything is initialised.
     l_systems(int argc, char **argv) : app(argc, argv), font(512, 256, "assets/big.fnt") {
     }
 
     // this generates a set of sprites from the given string and parameters
-    std::vector<sprite*> turtleGraphics(std::string str, float angle) {
+    std::vector<sprite*> turtleGraphics(std::string str, float angle, std::string ignored = "") {
       GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
       std::vector<sprite*> sprites;
       std::vector<mat4t> matstack;
@@ -222,14 +297,18 @@ namespace octet {
       for (std::string::iterator it = str.begin(); it != str.end(); ++it) {
         if (*it == '[') {
           matstack.push_back(mat);
-          mat.rotateZ(angle);
         }
         else if (*it == ']') {
           mat = matstack.back();
           matstack.pop_back();
+        }
+        else if (*it == '+') {
+          mat.rotateZ(angle);
+        }
+        else if (*it == '-') {
           mat.rotateZ(-angle);
         }
-        else {
+        else if (ignored.find_first_of(*it) == std::string::npos) {
           sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
           mat.translate(0, 1, 0);
         }
@@ -258,21 +337,17 @@ namespace octet {
       // set up the shader
       texture_shader_.init();
 
-      // set up the matrices with a camera 5 units from the origin
-      cameraToWorld.loadIdentity();
-      cameraToWorld.translate(0, 6, 10);
-
+      // load texture for text
       font_texture = resource_dict::get_texture_handle(GL_RGBA, "assets/big_0.gif");
 
       // Create the l-system class object
-      std::string axiom = "0";
-      std::map<char, std::string> rules;
-      rules['1'] = "11";
-      rules['0'] = "1[0]0";
-      lsystem.init(axiom, rules);
+      struct config conf;
+      if (loadConfigFile(conf, "config/config6.txt")) {
+        lsystem.init(conf.axiom, conf.rules);
 
-      sprites = turtleGraphics(lsystem.getIteration(6), 30);
-      cameraToWorld = centreCameraOnSprites(sprites);
+        sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+        cameraToWorld = centreCameraOnSprites(sprites);
+      }
     }
 
     /// this is called to draw the world

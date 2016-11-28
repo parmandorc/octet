@@ -1,0 +1,5 @@
+n = 4
+angle = 22.5
+axiom = F
+rule: F
+	FF-[-F+F+F]+[+F-F-F]

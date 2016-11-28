@@ -1,0 +1,5 @@
+n = 5
+angle = 25.7
+axiom = F
+rule: F
+	F[+F]F[-F]F
