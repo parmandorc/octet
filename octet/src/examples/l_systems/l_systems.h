@@ -99,6 +99,54 @@ namespace octet {
     }
   };
 
+  class l_system {
+    // The axiom of the system
+    std::string axiom;
+
+    // The set of rules for generation
+    std::map<char, std::string> rules;
+
+    // The different iterations of the execution of the system
+    // This are used to generate the sprites via turtle-graphics
+    std::vector<std::string> iterations;
+
+    // Executes the system to create the following iteration to the last one created.
+    void runNextIteration() {
+      std::string newIteration;
+      
+      for (std::string::iterator it = iterations.back().begin(); it != iterations.back().end(); ++it) {
+        std::map<char, std::string>::iterator m_it = rules.find(*it);
+        if (m_it != rules.end()) { //If a rule exists with this element...
+          newIteration += (*m_it).second;
+        }
+        else { //If a rule doesn't exist, append character
+          newIteration += *it;
+        }
+      }
+
+      iterations.push_back(newIteration);
+    }
+
+  public:
+    l_system() {}
+
+    void init(std::string _axiom, std::map<char, std::string> _rules) {
+      axiom = _axiom;
+      rules = _rules;
+      iterations.clear();
+      iterations.push_back(axiom);
+    }
+
+    std::string getIteration(unsigned int i) {
+      while (iterations.size() <= i) {
+        runNextIteration();
+      }
+
+      return iterations[i];
+    }
+
+  };
+
   /// Scene containing the l-systems app
   class l_systems : public app {
 
@@ -117,6 +165,9 @@ namespace octet {
 
     // collection of sprites
     std::vector<sprite*> sprites;
+
+    // generative l-system to use
+    l_system lsystem;
 
     void draw_text(texture_shader &shader, float x, float y, float scale, const char *text) {
       mat4t modelToWorld;
@@ -156,6 +207,32 @@ namespace octet {
     l_systems(int argc, char **argv) : app(argc, argv), font(512, 256, "assets/big.fnt") {
     }
 
+    // this generates a set of sprites from the given string and parameters
+    std::vector<sprite*> turtleGraphics(std::string str, float angle) {
+      GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
+      std::vector<sprite*> sprites;
+      std::vector<mat4t> matstack;
+      mat4t mat;
+      mat.loadIdentity();
+
+      for (std::string::iterator it = str.begin(); it != str.end(); ++it) {
+        if (*it == '[') {
+          matstack.push_back(mat);
+          mat.rotateZ(angle);
+        }
+        else if (*it == ']') {
+          mat = matstack.back();
+          matstack.pop_back();
+          mat.rotateZ(-angle);
+        }
+        else {
+          sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
+          mat.translate(0, 1, 0);
+        }
+      }
+      return sprites;
+    }
+
     /// this is called once OpenGL is initialized
     void app_init() {
       // set up the shader
@@ -163,21 +240,18 @@ namespace octet {
 
       // set up the matrices with a camera 5 units from the origin
       cameraToWorld.loadIdentity();
-      cameraToWorld.translate(0, 0, 3);
+      cameraToWorld.translate(0, 6, 10);
 
       font_texture = resource_dict::get_texture_handle(GL_RGBA, "assets/big_0.gif");
 
-      GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
-      mat4t mat;
-      mat.loadIdentity();
-      mat.translate(0, -1, 0);
-      sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
-      mat.translate(0, 1, 0);
-      mat.rotateZ(30);
-      sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
-      mat.translate(0, 1, 0);
-      mat.rotateZ(30);
-      sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
+      // Create the l-system class object
+      std::string axiom = "0";
+      std::map<char, std::string> rules;
+      rules['1'] = "11";
+      rules['0'] = "1[0]0";
+      lsystem.init(axiom, rules);
+
+      sprites = turtleGraphics(lsystem.getIteration(4), 30);
     }
 
     /// this is called to draw the world
@@ -202,7 +276,7 @@ namespace octet {
 
       char text[32];
       sprintf(text, "L-systems\n");
-      draw_text(texture_shader_, -1.75f, 2, 1.0f / 256, text);
+      //draw_text(texture_shader_, -1.75f, 2, 1.0f / 256, text);
     }
   };
 }
