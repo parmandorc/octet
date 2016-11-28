@@ -97,6 +97,10 @@ namespace octet {
     bool &is_enabled() {
       return enabled;
     }
+
+    mat4t getModelToWorld() {
+      return modelToWorld;
+    }
   };
 
   class l_system {
@@ -233,6 +237,22 @@ namespace octet {
       return sprites;
     }
 
+    mat4t centreCameraOnSprites(std::vector<sprite*> sprites) {
+      vec4 min, max;
+      min = max = (*sprites.begin())->getModelToWorld().w();
+      for (std::vector<sprite*>::iterator it = sprites.begin(); it != sprites.end(); ++it) {
+        min = (*it)->getModelToWorld().w().min(min);
+        max = (*it)->getModelToWorld().w().max(max);
+      }
+
+      mat4t mat;
+      mat.loadIdentity();
+      mat.w() = (min + max) * 0.5f;
+      vec4 d = max - min;
+      mat.translate(0, 0, (d[0] > d[1] ? d[0] : d[1]) * 0.75f + 1.0f);
+      return mat;
+    }
+
     /// this is called once OpenGL is initialized
     void app_init() {
       // set up the shader
@@ -251,7 +271,8 @@ namespace octet {
       rules['0'] = "1[0]0";
       lsystem.init(axiom, rules);
 
-      sprites = turtleGraphics(lsystem.getIteration(4), 30);
+      sprites = turtleGraphics(lsystem.getIteration(6), 30);
+      cameraToWorld = centreCameraOnSprites(sprites);
     }
 
     /// this is called to draw the world
