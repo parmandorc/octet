@@ -181,6 +181,9 @@ namespace octet {
     // generative l-system to use
     l_system lsystem;
 
+    // parameters of the l-system
+    struct config conf;
+
     void draw_text(texture_shader &shader, float x, float y, float scale, const char *text) {
       mat4t modelToWorld;
       modelToWorld.loadIdentity();
@@ -332,6 +335,31 @@ namespace octet {
       return mat;
     }
 
+    void input() {
+
+      // Cycle through config files
+      for (int i = 1; i <= 8; ++i) {
+        if (is_key_going_down('0' + i)) {
+          char filePath[32];
+          sprintf(filePath, "config/config%d.txt", i);
+          if (loadConfigFile(conf, filePath)) {
+            lsystem.init(conf.axiom, conf.rules);
+            std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
+            sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+            cameraToWorld = centreCameraOnSprites(sprites);
+          }
+        }
+      }
+
+      // Cycle through iterations
+      if (is_key_going_down(key_right) || is_key_going_down(key_left)) {
+        conf.n += is_key_going_down(key_right) ? 1 : (conf.n > 1 ? -1 : 0);
+        std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
+        sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+        cameraToWorld = centreCameraOnSprites(sprites);
+      }
+    }
+
     /// this is called once OpenGL is initialized
     void app_init() {
       // set up the shader
@@ -340,11 +368,9 @@ namespace octet {
       // load texture for text
       font_texture = resource_dict::get_texture_handle(GL_RGBA, "assets/big_0.gif");
 
-      // Create the l-system class object
-      struct config conf;
-      if (loadConfigFile(conf, "config/config6.txt")) {
+      // Load the l-system from the default config file
+      if (loadConfigFile(conf, "config/config1.txt")) {
         lsystem.init(conf.axiom, conf.rules);
-
         sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
         cameraToWorld = centreCameraOnSprites(sprites);
       }
@@ -352,6 +378,8 @@ namespace octet {
 
     /// this is called to draw the world
     void draw_world(int x, int y, int w, int h) {
+
+      input();
 
       // set a viewport - includes whole window area
       glViewport(x, y, w, h);
