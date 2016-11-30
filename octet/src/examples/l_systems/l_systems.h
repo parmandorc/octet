@@ -92,8 +92,8 @@ namespace octet {
     }
 
     // move the object
-    void translate(float x, float y) {
-      modelToWorld.translate(x, y, 0);
+    void setTransform(mat4t mat) {
+      modelToWorld = mat;
     }
 
     bool &is_enabled() {
@@ -154,6 +154,7 @@ namespace octet {
   };
 
   struct config {
+    char name[32];
     unsigned int n;
     float angle;
     std::string axiom;
@@ -180,6 +181,12 @@ namespace octet {
     // collection of sprites
     std::vector<sprite*> sprites;
 
+    // sprite used for UI overlay
+    sprite UI_BackgroundBox;
+
+    // whether to show or hide the UI
+    bool showUI;
+
     // generative l-system to use
     l_system lsystem;
 
@@ -187,9 +194,8 @@ namespace octet {
     struct config conf;
 
     void draw_text(texture_shader &shader, float x, float y, float scale, const char *text) {
-      mat4t modelToWorld;
-      modelToWorld.loadIdentity();
-      modelToWorld.translate(x, y, 0);
+      mat4t modelToWorld = cameraToWorld;
+      modelToWorld.translate(x, y, -1);
       modelToWorld.scale(scale, scale, 1);
       mat4t modelToProjection = mat4t::build_projection_matrix(modelToWorld, cameraToWorld);
 
@@ -224,6 +230,8 @@ namespace octet {
       if (!is.good()) {
         is.close(); return false;
       }
+
+      sprintf(conf.name, "%s", file);
 
       // store the line here
       char buffer[256];
@@ -360,6 +368,10 @@ namespace octet {
         sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
         cameraToWorld = centreCameraOnSprites(sprites);
       }
+
+      // Toggle UI
+      if (is_key_going_down(key_esc))
+        showUI = !showUI;
     }
 
     /// this is called once OpenGL is initialized
@@ -376,6 +388,11 @@ namespace octet {
         sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
         cameraToWorld = centreCameraOnSprites(sprites);
       }
+
+      // Create the UI permanent elements
+      GLuint bgColor = resource_dict::get_texture_handle(GL_RGBA, "#00000077");
+      UI_BackgroundBox.init(bgColor, mat4t().loadIdentity(), 0.75f, 0.3f);
+      showUI = false;
     }
 
     /// this is called to draw the world
@@ -387,7 +404,7 @@ namespace octet {
       glViewport(x, y, w, h);
 
       // clear the background to black
-      glClearColor(0, 0, 0, 1);
+      glClearColor(0.5f, 0.5f, 0.5f, 1);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       // don't allow Z buffer depth testing (closer objects are always drawn in front of far ones)
@@ -400,9 +417,26 @@ namespace octet {
       // draw all the sprites
       std::for_each(sprites.begin(), sprites.end(), [this](sprite* s) { s->render(texture_shader_, cameraToWorld, cameraToWorld.w()[2] * 0.00266667f); });
 
-      char text[32];
-      sprintf(text, "L-systems\n");
-      //draw_text(texture_shader_, -1.75f, 2, 1.0f / 256, text);
+      // draw UI
+      if (showUI) {
+        //background panel
+        mat4t mat = cameraToWorld;
+        mat.translate(-0.6f, 0.8125f, -1);
+        UI_BackgroundBox.setTransform(mat);
+        UI_BackgroundBox.render(texture_shader_, cameraToWorld);
+
+        //file name
+        draw_text(texture_shader_, -0.75f, 0.75f, 0.00075f, conf.name);
+
+        //iteration number
+        char text[32];
+        sprintf(text, "Iteration (n): %d", conf.n);
+        draw_text(texture_shader_, -0.75f, 0.65f, 0.00075f, text);
+
+        //angle value
+        sprintf(text, "Angle: %.1f", conf.angle);
+        draw_text(texture_shader_, -0.75f, 0.6f, 0.00075f, text);
+      }
     }
   };
 }
