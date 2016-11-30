@@ -39,9 +39,11 @@ namespace octet {
       return this;
     }
 
-    void render(texture_shader &shader, mat4t &cameraToWorld) {
+    void render(texture_shader &shader, mat4t &cameraToWorld, float width = -1) {
       // invisible sprite
       if (!texture) return;
+
+      float halfWidth = width < 0 ? this->halfWidth : width * 0.5f;
 
       // build a projection matrix: model -> world -> camera -> projection
       // the projection space is the cube -1 <= x/w, y/w, z/w <= 1
@@ -312,7 +314,7 @@ namespace octet {
           mat.rotateZ(-angle);
         }
         else if (ignored.find_first_of(*it) == std::string::npos) {
-          sprites.push_back((new sprite())->init(white, mat, 0.2f, 1));
+          sprites.push_back((new sprite())->init(white, mat, 0, 1));
           mat.translate(0, 1, 0);
         }
       }
@@ -396,7 +398,7 @@ namespace octet {
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       // draw all the sprites
-      std::for_each(sprites.begin(), sprites.end(), [this](sprite* s) { s->render(texture_shader_, cameraToWorld); });
+      std::for_each(sprites.begin(), sprites.end(), [this](sprite* s) { s->render(texture_shader_, cameraToWorld, cameraToWorld.w()[2] * 0.00266667f); });
 
       char text[32];
       sprintf(text, "L-systems\n");
