@@ -23,15 +23,19 @@ namespace octet {
     // true if this sprite is enabled.
     bool enabled;
 
+    // the multiply factor for the width the sprite will be rendered with
+    float widthFactor;
+
   public:
     sprite() {
       texture = 0;
       enabled = true;
     }
 
-    sprite* init(int _texture, mat4t mat, float w, float h) {
+    sprite* init(int _texture, mat4t mat, float w, float h, float wFactor = 1.0f) {
       halfWidth = w * 0.5f;
       halfHeight = h * 0.5f;
+      widthFactor = wFactor;
       modelToWorld = mat;
       modelToWorld.translate(0, halfHeight, 0);
       texture = _texture;
@@ -43,7 +47,7 @@ namespace octet {
       // invisible sprite
       if (!texture) return;
 
-      float halfWidth = width < 0 ? this->halfWidth : width * 0.5f;
+      float halfWidth = (width < 0 ? this->halfWidth : width * 0.5f) * widthFactor;
 
       // build a projection matrix: model -> world -> camera -> projection
       // the projection space is the cube -1 <= x/w, y/w, z/w <= 1
@@ -165,6 +169,8 @@ namespace octet {
     float angle_var2; //right
     
     unsigned int seed;
+
+    bool drawLeaves;
 
     std::string axiom;
     std::map<char, std::string> rules;
@@ -306,6 +312,7 @@ namespace octet {
       }
 
       conf.seed = 0x9bac7615;
+      conf.drawLeaves = false;
 
       is.close();
       return true;
@@ -319,6 +326,8 @@ namespace octet {
     // this generates a set of sprites from the given string and parameters
     std::vector<sprite*> turtleGraphics(std::string str, const struct config *conf, std::string ignored = "") {
       GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
+      GLuint green = resource_dict::get_texture_handle(GL_RGB, "#00ff00");
+      GLuint brown = resource_dict::get_texture_handle(GL_RGB, "#994C00");
       std::vector<sprite*> sprites;
       std::vector<mat4t> matstack;
       mat4t mat;
@@ -330,6 +339,9 @@ namespace octet {
           matstack.push_back(mat);
         }
         else if (*it == ']') {
+          if (conf->drawLeaves)
+            sprites.push_back((new sprite())->init(green, mat, 0, 1, 5.0f));
+
           mat = matstack.back();
           matstack.pop_back();
         }
@@ -344,10 +356,14 @@ namespace octet {
           mat.rotateZ(-angle);
         }
         else if (ignored.find_first_of(*it) == std::string::npos) {
-          sprites.push_back((new sprite())->init(white, mat, 0, 1));
+          sprites.push_back((new sprite())->init(conf->drawLeaves ? brown : white, mat, 0, 1));
           mat.translate(0, 1, 0);
         }
       }
+
+      if (conf->drawLeaves)
+        sprites.push_back((new sprite())->init(green, mat, 0, 1, 5.0f));
+
       return sprites;
     }
 
@@ -444,6 +460,14 @@ namespace octet {
         cameraToWorld = centreCameraOnSprites(sprites);
       }
 
+      // Toggle drawing leaves
+      if (is_key_going_down('L')) {
+        conf.drawLeaves = !conf.drawLeaves;
+        std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
+        sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
+        cameraToWorld = centreCameraOnSprites(sprites);
+      }
+
       // Toggle UI
       if (is_key_going_down(key_esc))
         showUI = !showUI;
@@ -467,7 +491,7 @@ namespace octet {
       // Create the UI permanent elements
       GLuint bgColor = resource_dict::get_texture_handle(GL_RGBA, "#00000077");
       UI_BackgroundBox.init(bgColor, mat4t().loadIdentity(), 0.75f, 0.4f);
-      showUI = false;
+      showUI = true;
     }
 
     /// this is called to draw the world
