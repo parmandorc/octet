@@ -249,7 +249,10 @@ namespace octet {
         is.close(); return false;
       }
 
+      conf.seed = 0x9bac7615;
+      conf.drawLeaves = false;
       sprintf(conf.name, "%s", file);
+      conf.rules.clear();
 
       // store the line here
       char buffer[256];
@@ -310,9 +313,6 @@ namespace octet {
           }
         }
       }
-
-      conf.seed = 0x9bac7615;
-      conf.drawLeaves = false;
 
       is.close();
       return true;

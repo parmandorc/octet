@@ -1,0 +1,7 @@
+n = 6
+angle = 60
+axiom = A
+rule: A
+	+B-A-B+
+rule: B
+	-A+B+A-

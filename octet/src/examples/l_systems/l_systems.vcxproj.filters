@@ -459,5 +459,11 @@
     <Text Include="config\config6.txt">
       <Filter>config</Filter>
     </Text>
+    <Text Include="config\config8.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="config\config7.txt">
+      <Filter>config</Filter>
+    </Text>
   </ItemGroup>
 </Project>
