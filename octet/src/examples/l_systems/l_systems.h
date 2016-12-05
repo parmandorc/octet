@@ -361,8 +361,19 @@ namespace octet {
         }
       }
 
+      // Modify angle
+      if (is_key_down('A')) {
+        float delta = (is_key_going_down(key_up) - is_key_going_down(key_down)) * 2.5f;
+        if (delta != 0.0f) {
+          conf.angle += delta;
+          std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
+          sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+          cameraToWorld = centreCameraOnSprites(sprites);
+        }
+      }
+
       // Cycle through iterations
-      if (is_key_going_down(key_right) || is_key_going_down(key_left)) {
+      else if (is_key_going_down(key_right) || is_key_going_down(key_left)) {
         conf.n += is_key_going_down(key_right) ? 1 : (conf.n > 1 ? -1 : 0);
         std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
         sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
