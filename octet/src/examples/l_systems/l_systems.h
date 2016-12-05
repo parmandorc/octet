@@ -161,6 +161,10 @@ namespace octet {
     bool useSeparateAngles;
     float angle; //main or left
     float angle2; //right
+    float angle_var; //main or left
+    float angle_var2; //right
+    
+    unsigned int seed;
 
     std::string axiom;
     std::map<char, std::string> rules;
@@ -197,6 +201,9 @@ namespace octet {
 
     // parameters of the l-system
     struct config conf;
+
+    // random generator for angle variance
+    class random randomizer;
 
     void draw_text(texture_shader &shader, float x, float y, float scale, const char *text) {
       mat4t modelToWorld = cameraToWorld;
@@ -267,6 +274,7 @@ namespace octet {
           conf.useSeparateAngles = false;
           conf.angle = std::atof(b);
           conf.angle2 = conf.angle;
+          conf.angle_var = conf.angle_var2 = 0.0f;
         }
         else if (!param.compare("axiom")) {
           conf.axiom = std::string(b, e);
@@ -297,6 +305,8 @@ namespace octet {
         }
       }
 
+      conf.seed = 0x9bac7615;
+
       is.close();
       return true;
     }
@@ -313,6 +323,7 @@ namespace octet {
       std::vector<mat4t> matstack;
       mat4t mat;
       mat.loadIdentity();
+      randomizer.set_seed(conf->seed);
 
       for (std::string::iterator it = str.begin(); it != str.end(); ++it) {
         if (*it == '[') {
@@ -323,10 +334,14 @@ namespace octet {
           matstack.pop_back();
         }
         else if (*it == '+') {
-          mat.rotateZ(conf->angle);
+          float angle = conf->angle + randomizer.get(-conf->angle_var, conf->angle_var);
+          mat.rotateZ(angle);
         }
         else if (*it == '-') {
-          mat.rotateZ(- (conf->useSeparateAngles ? conf->angle2 : conf->angle));
+          float angle = !conf->useSeparateAngles ? conf->angle : conf->angle2;
+          float angle_var = !conf->useSeparateAngles ? conf->angle_var : conf->angle_var2;
+          angle += randomizer.get(-angle_var, angle_var);
+          mat.rotateZ(-angle);
         }
         else if (ignored.find_first_of(*it) == std::string::npos) {
           sprites.push_back((new sprite())->init(white, mat, 0, 1));
@@ -368,7 +383,6 @@ namespace octet {
         }
       }
 
-
       // Modify angle
       if (is_key_down('A')) {
         float delta = is_key_down(key_up) - is_key_down(key_down);
@@ -388,9 +402,43 @@ namespace octet {
         }
       }
 
+      // Modify angle variance
+      else if (is_key_down('V')) {
+        float delta = is_key_down(key_up) - is_key_down(key_down);
+        if (delta != 0.0f) {
+          if (is_key_down(key_left) || is_key_down(key_right))
+            conf.useSeparateAngles = true;
+
+          float new_var = conf.angle_var;
+          float new_var2 = conf.angle_var2;
+
+          if (!conf.useSeparateAngles || is_key_down(key_left) || !is_key_down(key_right))
+            new_var = conf.angle_var + delta;
+
+          if (!conf.useSeparateAngles || is_key_down(key_right) || !is_key_down(key_left))
+            new_var2 = conf.angle_var2 + delta;
+
+          if (!(new_var <= 0.0f && conf.angle_var == 0.0f) || !(new_var2 <= 0.0f && conf.angle_var2 == 0.0f)) {
+            conf.angle_var = (new_var <= 0.0f) ? 0.0f : new_var;
+            conf.angle_var2 = (new_var2 <= 0.0f) ? 0.0f : new_var2;
+            std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
+            sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
+            cameraToWorld = centreCameraOnSprites(sprites);
+          }
+        }
+      }
+
       // Cycle through iterations
       else if (is_key_going_down(key_right) || is_key_going_down(key_left)) {
         conf.n += is_key_going_down(key_right) ? 1 : (conf.n > 1 ? -1 : 0);
+        std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
+        sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
+        cameraToWorld = centreCameraOnSprites(sprites);
+      }
+
+      // Reload
+      if (is_key_going_down('R')) {
+        ++conf.seed;
         std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
         sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
         cameraToWorld = centreCameraOnSprites(sprites);
@@ -418,7 +466,7 @@ namespace octet {
 
       // Create the UI permanent elements
       GLuint bgColor = resource_dict::get_texture_handle(GL_RGBA, "#00000077");
-      UI_BackgroundBox.init(bgColor, mat4t().loadIdentity(), 0.75f, 0.3f);
+      UI_BackgroundBox.init(bgColor, mat4t().loadIdentity(), 0.75f, 0.4f);
       showUI = false;
     }
 
@@ -448,7 +496,7 @@ namespace octet {
       if (showUI) {
         //background panel
         mat4t mat = cameraToWorld;
-        mat.translate(-0.6f, 0.8125f, -1);
+        mat.translate(-0.6f, 0.7625f, -1);
         UI_BackgroundBox.setTransform(mat);
         UI_BackgroundBox.render(texture_shader_, cameraToWorld);
 
@@ -461,11 +509,20 @@ namespace octet {
         draw_text(texture_shader_, -0.75f, 0.65f, 0.00075f, text);
 
         //angle value
-        sprintf(text, "Angle%s: %.1f", conf.useSeparateAngles ? " (left)" : "", conf.angle);
+        char var_text[16] = "";
+        sprintf(text, "Angle%s: %.1f", conf.useSeparateAngles ? " (left)" : "", conf.angle, var_text);
         draw_text(texture_shader_, -0.75f, 0.6f, 0.00075f, text);
+        if (conf.angle_var > 0.0) {
+          sprintf(text, "(+/-) %.1f", conf.angle_var);
+          draw_text(texture_shader_, -0.65f, 0.55f, 0.00075f, text);
+        }
         if (conf.useSeparateAngles) {
-          sprintf(text, "Angle (right): %.1f", conf.angle2);
-          draw_text(texture_shader_, -0.75f, 0.55f, 0.00075f, text);
+          sprintf(text, "Angle (right): %.1f%s", conf.angle2, var_text);
+          draw_text(texture_shader_, -0.75f, conf.angle_var > 0.0f ? 0.5f : 0.55f, 0.00075f, text);
+          if (conf.angle_var2 > 0.0) {
+            sprintf(text, "(+/-) %.1f", conf.angle_var2);
+            draw_text(texture_shader_, -0.65f, conf.angle_var > 0.0f ? 0.45f : 0.5f, 0.00075f, text);
+          }
         }
       }
     }
