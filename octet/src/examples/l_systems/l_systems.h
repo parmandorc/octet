@@ -156,7 +156,12 @@ namespace octet {
   struct config {
     char name[32];
     unsigned int n;
-    float angle;
+    
+    //Wether to use two angle values for left and right turns
+    bool useSeparateAngles;
+    float angle; //main or left
+    float angle2; //right
+
     std::string axiom;
     std::map<char, std::string> rules;
     std::string ignored;
@@ -259,7 +264,9 @@ namespace octet {
           conf.n = std::atoi(b);
         }
         else if (!param.compare("angle")) {
+          conf.useSeparateAngles = false;
           conf.angle = std::atof(b);
+          conf.angle2 = conf.angle;
         }
         else if (!param.compare("axiom")) {
           conf.axiom = std::string(b, e);
@@ -300,7 +307,7 @@ namespace octet {
     }
 
     // this generates a set of sprites from the given string and parameters
-    std::vector<sprite*> turtleGraphics(std::string str, float angle, std::string ignored = "") {
+    std::vector<sprite*> turtleGraphics(std::string str, const struct config *conf, std::string ignored = "") {
       GLuint white = resource_dict::get_texture_handle(GL_RGB, "#ffffff");
       std::vector<sprite*> sprites;
       std::vector<mat4t> matstack;
@@ -316,10 +323,10 @@ namespace octet {
           matstack.pop_back();
         }
         else if (*it == '+') {
-          mat.rotateZ(angle);
+          mat.rotateZ(conf->angle);
         }
         else if (*it == '-') {
-          mat.rotateZ(-angle);
+          mat.rotateZ(- (conf->useSeparateAngles ? conf->angle2 : conf->angle));
         }
         else if (ignored.find_first_of(*it) == std::string::npos) {
           sprites.push_back((new sprite())->init(white, mat, 0, 1));
@@ -355,19 +362,28 @@ namespace octet {
           if (loadConfigFile(conf, filePath)) {
             lsystem.init(conf.axiom, conf.rules);
             std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
-            sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+            sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
             cameraToWorld = centreCameraOnSprites(sprites);
           }
         }
       }
 
+
       // Modify angle
       if (is_key_down('A')) {
-        float delta = (is_key_going_down(key_up) - is_key_going_down(key_down)) * 2.5f;
+        float delta = is_key_down(key_up) - is_key_down(key_down);
         if (delta != 0.0f) {
-          conf.angle += delta;
+          if (is_key_down(key_left) || is_key_down(key_right))
+            conf.useSeparateAngles = true;
+
+          if (!conf.useSeparateAngles || is_key_down(key_left) || !is_key_down(key_right))
+            conf.angle += delta;
+
+          if (!conf.useSeparateAngles || is_key_down(key_right) || !is_key_down(key_left))
+            conf.angle2 += delta;
+
           std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
-          sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+          sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
           cameraToWorld = centreCameraOnSprites(sprites);
         }
       }
@@ -376,7 +392,7 @@ namespace octet {
       else if (is_key_going_down(key_right) || is_key_going_down(key_left)) {
         conf.n += is_key_going_down(key_right) ? 1 : (conf.n > 1 ? -1 : 0);
         std::for_each(sprites.begin(), sprites.end(), [](sprite* s) { free(s); });
-        sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+        sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
         cameraToWorld = centreCameraOnSprites(sprites);
       }
 
@@ -396,7 +412,7 @@ namespace octet {
       // Load the l-system from the default config file
       if (loadConfigFile(conf, "config/config1.txt")) {
         lsystem.init(conf.axiom, conf.rules);
-        sprites = turtleGraphics(lsystem.getIteration(conf.n), conf.angle, conf.ignored);
+        sprites = turtleGraphics(lsystem.getIteration(conf.n), &conf, conf.ignored);
         cameraToWorld = centreCameraOnSprites(sprites);
       }
 
@@ -445,8 +461,12 @@ namespace octet {
         draw_text(texture_shader_, -0.75f, 0.65f, 0.00075f, text);
 
         //angle value
-        sprintf(text, "Angle: %.1f", conf.angle);
+        sprintf(text, "Angle%s: %.1f", conf.useSeparateAngles ? " (left)" : "", conf.angle);
         draw_text(texture_shader_, -0.75f, 0.6f, 0.00075f, text);
+        if (conf.useSeparateAngles) {
+          sprintf(text, "Angle (right): %.1f", conf.angle2);
+          draw_text(texture_shader_, -0.75f, 0.55f, 0.00075f, text);
+        }
       }
     }
   };
